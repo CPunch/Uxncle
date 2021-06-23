@@ -22,6 +22,18 @@ UASTNode* parsePrecedence(UParseState *state, UASTNode *left, Precedence prec);
 UASTNode* expression(UParseState *state);
 ParseRule ruleTable[];
 
+int str2int(char *str, int len) {
+    int i;
+    int ret = 0;
+
+    for(i = 0; i < len; ++i) {
+        ret = ret * 10 + (str[i] - '0');
+    }
+
+    return ret;
+}
+
+
 /* ==================================[[ generic helper functions ]]================================== */
 
 UASTNode *newNode(UParseState *state, UASTNodeType type, UASTNode *left, UASTNode *right) {
@@ -58,7 +70,7 @@ void advance(UParseState *state) {
     state->current = UL_scanNext(&state->lstate);
 
     if (state->current.type == TOKEN_ERR)
-        error(state, "unrecognized symbol '%*s'!", state->current.len, state->current.str);
+        error(state, "unrecognized symbol '%.*s'!", state->current.len, state->current.str);
 }
 
 int check(UParseState *state, UTokenType type) {
@@ -78,21 +90,10 @@ ParseRule* getRule(UTokenType type) {
     return &ruleTable[type];
 }
 
-const char* getNodeType(UASTNodeType type) {
-    switch(type) {
-        case NODE_ADD: return "ADD";
-        case NODE_SUB: return "SUB";
-        case NODE_MUL: return "MUL";
-        case NODE_DIV: return "DIV";
-        case NODE_NUM: return "NUM";
-        default: return "err";
-    }
-}
-
 /* ==================================[[ parse functions ]]================================== */
 
 UASTNode* number(UParseState *state, UASTNode *left, Precedence currPrec) {
-    int num = atoi(state->current.str);
+    int num = str2int(state->previous.str, state->previous.len);
     return newNumNode(state, NULL, NULL, num);
 }
 
@@ -107,12 +108,12 @@ UASTNode* binOperator(UParseState *state, UASTNode *left, Precedence currPrec) {
         case TOKEN_STAR: type = NODE_MUL; break;
         case TOKEN_SLASH: type = NODE_DIV; break;
         default:
-            error(state, "Unknown binary operator '%*s'!", state->current.len, state->current.str);
+            error(state, "Unknown binary operator '%.*s'!", state->current.len, state->current.str);
             return NULL;
     }
 
     /* grab the right node */
-    right = expression(state);
+    right = parsePrecedence(state, NULL, currPrec);
     return newNode(state, type, left, right);
 }
 
@@ -158,8 +159,12 @@ UASTNode* parsePrecedence(UParseState *state, UASTNode *left, Precedence prec) {
     left = func(state, left, prec);
     while (prec <= getRule(state->current.type)->level) {
         func = getRule(state->current.type)->infix;
+        if (func == NULL) {
+            error(state, "Illegal syntax!");
+            return NULL;
+        }
         advance(state);
-        left = func(state, left, prec);
+        left = func(state, left, getRule(state->previous.type)->level);
     }
 
     return left;
@@ -174,8 +179,22 @@ UASTNode* statement(UParseState *state) {
     return NULL;
 }
 
+void printNode(UASTNode *node) {
+    switch(node->type) {
+        case NODE_ADD: printf("ADD"); break;
+        case NODE_SUB: printf("SUB"); break;
+        case NODE_MUL: printf("MUL"); break;
+        case NODE_DIV: printf("DIV"); break;
+        case NODE_NUM: printf("[%d]", node->num); break;
+        default: break;
+    }
+}
+
 void printTree(UASTNode *node, int indent) {
-    printf("%*s%s\n", indent, "", getNodeType(node->type));
+    printf("%*s", indent, "");
+    printNode(node);
+    printf("\n");
+
     if (node->left)
         printTree(node->left, indent-5);
     if (node->right)
@@ -189,7 +208,7 @@ UASTNode *UP_parseSource(const char *src) {
     advance(&state);
 
     UASTNode *tree = expression(&state);
-    printTree(tree, 8);
+    printTree(tree, 16);
 
-    return NULL;
+    return tree;
 }

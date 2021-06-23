@@ -1,8 +1,11 @@
 #ifndef UASM_H
 #define UASM_H
 
-#define PAGE_PROGRAM 0x0100
-#define STACK_LIMIT 256
+#include "uparse.h"
 
+#include <stdio.h>
+
+/* takes a syntax tree and spits out the generated asm into the provided file stream */
+void UA_genTal(UASTNode *tree, FILE *out);
 
 #endif

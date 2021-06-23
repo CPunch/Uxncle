@@ -109,13 +109,13 @@ UToken readIdentifier(ULexState *state) {
 UToken UL_scanNext(ULexState *state) {
     char c;
 
-    /* mark start of token and check if it's the end of the string */
-    state->start = state->current;
+    /* check if it's the end of the string */
     if (isEnd(state))
         return makeToken(state, TOKEN_EOF);
 
     /* skip all whitespace characters then grab the next character */
     skipWhitespace(state);
+    state->start = state->current;
     c = next(state);
 
     switch (c) {
