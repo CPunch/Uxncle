@@ -99,7 +99,7 @@ UToken readNumber(ULexState *state) {
 }
 
 UToken readIdentifier(ULexState *state) {
-    while (!isEnd(state) && (isAlpha(peek(state)) || isNumerical(peek(state)))) 
+    while (!isEnd(state) && (isAlpha(peek(state)) || isNumeric(peek(state)))) 
         next(state);
 
     return makeToken(state, identifierType(state)); /* is it a reserved word? */

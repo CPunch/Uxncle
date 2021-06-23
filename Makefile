@@ -1,13 +1,15 @@
 CC=clang
 CFLAGS=-fPIE -Wall -O3 -Isrc -std=c99
 LDFLAGS=-lm #-fsanitize=address
-OUT=bin/uxnscr
+OUT=bin/uxncle
 
 CHDR=\
 	src/ulex.h\
+	src/uparse.h\
 
 CSRC=\
 	src/ulex.c\
+	src/uparse.c\
 	src/main.c
 
 COBJ=$(CSRC:.c=.o)
