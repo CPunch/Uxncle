@@ -1,0 +1,7 @@
+short sub(short a, short b) {
+    return a - b;
+}
+
+void main() {
+    sub(5, 4);
+}
