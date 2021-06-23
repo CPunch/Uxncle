@@ -1,7 +1,9 @@
 #include "uparse.h"
+#include "uasm.h"
 
 int main() {
-    UP_parseSource("5 + 3 * 2");
+    UASTNode *tree = UP_parseSource("2 * 4 + 6");
+    UA_genTal(tree, fopen("out.tal", "w"));
 
     return 0;
 }

@@ -46,7 +46,7 @@ UASTNode *newNode(UParseState *state, UASTNodeType type, UASTNode *left, UASTNod
 }
 
 UASTNode *newNumNode(UParseState *state, UASTNode *left, UASTNode *right, int num) {
-    UASTNode *node = newNode(state, NODE_NUM, left, right);
+    UASTNode *node = newNode(state, NODE_INTLIT, left, right);
     node->num = num;
 
     return node;
@@ -185,7 +185,7 @@ void printNode(UASTNode *node) {
         case NODE_SUB: printf("SUB"); break;
         case NODE_MUL: printf("MUL"); break;
         case NODE_DIV: printf("DIV"); break;
-        case NODE_NUM: printf("[%d]", node->num); break;
+        case NODE_INTLIT: printf("[%d]", node->num); break;
         default: break;
     }
 }

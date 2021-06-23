@@ -6,10 +6,12 @@ OUT=bin/uxncle
 CHDR=\
 	src/ulex.h\
 	src/uparse.h\
+	src/uasm.h\
 
 CSRC=\
 	src/ulex.c\
 	src/uparse.c\
+	src/uasm.c\
 	src/main.c
 
 COBJ=$(CSRC:.c=.o)

@@ -8,7 +8,7 @@ typedef enum {
     NODE_SUB,
     NODE_MUL,
     NODE_DIV,
-    NODE_NUM
+    NODE_INTLIT
 } UASTNodeType;
 
 typedef struct s_UASTNode {
