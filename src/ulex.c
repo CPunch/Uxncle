@@ -14,7 +14,7 @@ UReservedWord reservedWords[] = {
 };
 
 void UL_initLexState(ULexState *state, const char *src) {
-    state->current = src;
+    state->current = (char*)src;
     state->line = 1;
     state->last = TOKEN_ERR;
 }
@@ -25,7 +25,7 @@ UToken makeToken(ULexState *state, UTokenType type) {
     token.len = state->current - state->start;
     token.type = type;
 
-    // update the state's last token type
+    /* update the state's last token type */
     state->last = type;
     return token;
 }
@@ -79,10 +79,11 @@ void skipWhitespace(ULexState *state) {
 }
 
 UTokenType identifierType(ULexState *state) {
+    int i;
     int len = state->start - state->current;
 
     /* walk through each reserved word and compare it */
-    for (int i = 0; i < sizeof(reservedWords)/sizeof(UReservedWord); i++) {
+    for (i = 0; i < sizeof(reservedWords)/sizeof(UReservedWord); i++) {
         if (reservedWords[i].len == len && memcmp(state->start, reservedWords[i].word, len))
             return reservedWords[i].type;
     }

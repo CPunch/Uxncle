@@ -1,5 +1,5 @@
 CC=clang
-CFLAGS=-fPIE -Wall -O3 -Isrc -std=c99
+CFLAGS=-fPIE -Wall -O3 -Isrc -std=c89
 LDFLAGS=-lm #-fsanitize=address
 OUT=bin/uxncle
 

@@ -3,11 +3,11 @@
 
 typedef enum {
     PREC_NONE,
-    PREC_ASSIGNMENT,    // =
-    PREC_TERM,          // + -
-    PREC_FACTOR,        // * /
-    PREC_LITERAL,       // literal values
-    PREC_PRIMARY        // everything else
+    PREC_ASSIGNMENT,    /* = */
+    PREC_TERM,          /* + - */
+    PREC_FACTOR,        /* * / */
+    PREC_LITERAL,       /* literal values */
+    PREC_PRIMARY        /* everything else */
 } Precedence;
 
 typedef UASTNode* (*ParseFunc)(UParseState *state, UASTNode *left, Precedence currPrec);
