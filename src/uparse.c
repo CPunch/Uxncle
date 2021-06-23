@@ -33,6 +33,13 @@ UASTNode *newNode(UParseState *state, UASTNodeType type, UASTNode *left, UASTNod
     return node;
 }
 
+UASTNode *newNumNode(UParseState *state, UASTNode *left, UASTNode *right, int num) {
+    UASTNode *node = newNode(state, NODE_NUM, left, right);
+    node->num = num;
+
+    return node;
+}
+
 void errorAt(UToken *token, int line, const char *fmt, va_list args) {
     printf("Syntax error at '%*s' on line %d", token->len, token->str, line);
     vprintf(fmt, args);
@@ -49,6 +56,9 @@ void error(UParseState *state, const char *fmt, ...) {
 void advance(UParseState *state) {
     state->previous = state->current;
     state->current = UL_scanNext(&state->lstate);
+
+    if (state->current.type == TOKEN_ERR)
+        error(state, "unrecognized symbol '%*s'!", state->current.len, state->current.str);
 }
 
 int check(UParseState *state, UTokenType type) {
@@ -83,7 +93,7 @@ const char* getNodeType(UASTNodeType type) {
 
 UASTNode* number(UParseState *state, UASTNode *left, Precedence currPrec) {
     int num = atoi(state->current.str);
-    return newNode(state, NODE_NUM, NULL, NULL);
+    return newNumNode(state, NULL, NULL, num);
 }
 
 UASTNode* binOperator(UParseState *state, UASTNode *left, Precedence currPrec) {
