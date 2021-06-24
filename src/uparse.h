@@ -29,4 +29,6 @@ typedef struct {
 /* returns the base AST node, or NULL if a syntax error occurred */
 UASTNode *UP_parseSource(const char *src);
 
+void UP_freeTree(UASTNode *tree);
+
 #endif

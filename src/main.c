@@ -5,5 +5,7 @@ int main() {
     UASTNode *tree = UP_parseSource("6 + 2 * 21 + 3 * 6");
     UA_genTal(tree, fopen("out.tal", "w"));
 
+    /* clean up */
+    UP_freeTree(tree);
     return 0;
 }

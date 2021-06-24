@@ -211,3 +211,12 @@ UASTNode *UP_parseSource(const char *src) {
 
     return tree;
 }
+
+void UP_freeTree(UASTNode *tree) {
+    if (tree->left)
+        UP_freeTree(tree->left);
+    if (tree->right)
+        UP_freeTree(tree->right);
+
+    UM_free(tree);
+}
