@@ -9,7 +9,7 @@ typedef struct {
 
 UReservedWord reservedWords[] = {
     {TOKEN_BYTE, "byte", 4},
-    {TOKEN_BYTE16, "byte16", 6},
+    {TOKEN_SHORT, "short", 5},
     {TOKEN_VOID, "void", 4}
 };
 

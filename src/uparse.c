@@ -33,7 +33,6 @@ int str2int(char *str, int len) {
     return ret;
 }
 
-
 /* ==================================[[ generic helper functions ]]================================== */
 
 UASTNode *newNode(UParseState *state, UASTNodeType type, UASTNode *left, UASTNode *right) {

@@ -1,6 +1,7 @@
 #ifndef UASM_H
 #define UASM_H
 
+#include "uxncle.h"
 #include "uparse.h"
 
 #include <stdio.h>

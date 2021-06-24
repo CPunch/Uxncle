@@ -4,7 +4,7 @@
 typedef enum {
     /* keywords */
     TOKEN_BYTE,
-    TOKEN_BYTE16,
+    TOKEN_SHORT,
     TOKEN_VOID,
 
     /* literals */

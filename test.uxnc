@@ -1,4 +1,4 @@
-short sub(short a, short b) {
+byte sub(byte a, byte b) {
     return a - b;
 }
 
