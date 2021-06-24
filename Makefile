@@ -1,14 +1,16 @@
 CC=clang
-CFLAGS=-fPIE -Wall -O3 -Isrc -std=c89
+CFLAGS=-fPIE -Wall -O2 -Isrc -std=c89
 LDFLAGS=-lm #-fsanitize=address
 OUT=bin/uxncle
 
 CHDR=\
+	src/umem.h\
 	src/ulex.h\
 	src/uparse.h\
 	src/uasm.h\
 
 CSRC=\
+	src/umem.c\
 	src/ulex.c\
 	src/uparse.c\
 	src/uasm.c\

@@ -5,14 +5,13 @@
 
 #define GROW_FACTOR 2
 
-#define UM_realloc(buf, size) \
-    realloc(buf, size);
+void* UM_realloc(void *buf, size_t size);
 
 #define UM_freearray(buf) \
-    UM_realloc(buf, NULL);
+    UM_realloc(buf, 0);
 
 #define UM_free(buf) \
-    UM_realloc(buf, NULL);
+    UM_realloc(buf, 0);
 
 #define UM_growarray(type, buf, count, capacity) \
     if (count >= capacity || buf == NULL) { \

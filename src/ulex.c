@@ -10,7 +10,8 @@ typedef struct {
 UReservedWord reservedWords[] = {
     {TOKEN_BYTE, "byte", 4},
     {TOKEN_SHORT, "short", 5},
-    {TOKEN_VOID, "void", 4}
+    {TOKEN_VOID, "void", 4},
+    {TOKEN_PRINTINT, "prntint", 7}
 };
 
 void UL_initLexState(ULexState *state, const char *src) {
@@ -80,11 +81,11 @@ void skipWhitespace(ULexState *state) {
 
 UTokenType identifierType(ULexState *state) {
     int i;
-    int len = state->start - state->current;
+    int len = state->current - state->start;
 
     /* walk through each reserved word and compare it */
     for (i = 0; i < sizeof(reservedWords)/sizeof(UReservedWord); i++) {
-        if (reservedWords[i].len == len && memcmp(state->start, reservedWords[i].word, len))
+        if (reservedWords[i].len == len && !memcmp(state->start, reservedWords[i].word, len))
             return reservedWords[i].type;
     }
 

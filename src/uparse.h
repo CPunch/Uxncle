@@ -8,8 +8,14 @@ typedef enum {
     NODE_SUB,
     NODE_MUL,
     NODE_DIV,
+    NODE_STATE, /* node->left holds expression tree, node->right holds the next statement */
     NODE_INTLIT
 } UASTNodeType;
+
+typedef enum {
+    STATE_PRNT,
+    STATE_EXPR
+} UStateType;
 
 typedef struct s_UASTNode {
     UASTNodeType type;
@@ -17,6 +23,7 @@ typedef struct s_UASTNode {
     struct s_UASTNode *right;
     union {
         int num;
+        UStateType sType;
     };
 } UASTNode;
 

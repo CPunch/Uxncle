@@ -51,22 +51,31 @@ UASTNode *newNumNode(UParseState *state, UASTNode *left, UASTNode *right, int nu
     return node;
 }
 
+UASTNode *newStateNode(UParseState *state, UASTNode *left, UASTNode *right, UStateType type) {
+    UASTNode *node = newNode(state, NODE_STATE, left, right);
+    node->sType = type;
+
+    return node;
+}
+
 void errorAt(UToken *token, int line, const char *fmt, va_list args) {
-    printf("Syntax error at '%*s' on line %d", token->len, token->str, line);
+    printf("Syntax error at '%.*s' on line %d\n\t", token->len, token->str, line);
     vprintf(fmt, args);
-    exit(0);
+    exit(EXIT_FAILURE);
 }
 
 void error(UParseState *state, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    errorAt(&state->current, state->lstate.line, fmt, args);
+    errorAt(&state->previous, state->lstate.line, fmt, args);
     va_end(args);
 }
 
 void advance(UParseState *state) {
     state->previous = state->current;
     state->current = UL_scanNext(&state->lstate);
+
+    printf("consumed '%.*s', with type %d\n", state->current.len, state->current.str, state->current.type);
 
     if (state->current.type == TOKEN_ERR)
         error(state, "unrecognized symbol '%.*s'!", state->current.len, state->current.str);
@@ -85,6 +94,10 @@ int match(UParseState *state, UTokenType type) {
     return 1;
 }
 
+int isPEnd(UParseState *state) {
+    return check(state, TOKEN_ERR) || check(state, TOKEN_EOF);
+}
+
 ParseRule* getRule(UTokenType type) {
     return &ruleTable[type];
 }
@@ -93,6 +106,7 @@ ParseRule* getRule(UTokenType type) {
 
 UASTNode* number(UParseState *state, UASTNode *left, Precedence currPrec) {
     int num = str2int(state->previous.str, state->previous.len);
+    printf("got number %d! from token '%.*s' [%d]\n", num, state->previous.len, state->previous.str, state->previous.type);
     return newNumNode(state, NULL, NULL, num);
 }
 
@@ -121,6 +135,7 @@ ParseRule ruleTable[] = {
     {NULL, NULL, PREC_NONE}, /* TOKEN_BYTE */
     {NULL, NULL, PREC_NONE}, /* TOKEN_BYTE16 */
     {NULL, NULL, PREC_NONE}, /* TOKEN_VOID */
+    {NULL, NULL, PREC_NONE}, /* TOKEN_PRINTINT */
 
     /* literals */
     {NULL, NULL, PREC_NONE}, /* TOKEN_IDENT */
@@ -143,6 +158,13 @@ ParseRule ruleTable[] = {
     {NULL, NULL, PREC_NONE}, /* TOKEN_ERR */
 };
 
+/* ==================================[[ parse statement functions ]]================================== */
+
+UASTNode* printStatement(UParseState *state) {
+    /* make our statement node & return */
+    UASTNode *node = expression(state);
+    return newStateNode(state, node, NULL, STATE_PRNT);
+}
 
 UASTNode* parsePrecedence(UParseState *state, UASTNode *left, Precedence prec) {
     ParseFunc func;
@@ -151,7 +173,7 @@ UASTNode* parsePrecedence(UParseState *state, UASTNode *left, Precedence prec) {
     advance(state);
     func = getRule(state->previous.type)->prefix;
     if (func == NULL) {
-        error(state, "Illegal syntax!");
+        error(state, "Illegal syntax! [prefix]");
         return NULL;
     }
 
@@ -159,7 +181,7 @@ UASTNode* parsePrecedence(UParseState *state, UASTNode *left, Precedence prec) {
     while (prec <= getRule(state->current.type)->level) {
         func = getRule(state->current.type)->infix;
         if (func == NULL) {
-            error(state, "Illegal syntax!");
+            error(state, "Illegal syntax! [infix]");
             return NULL;
         }
         advance(state);
@@ -170,12 +192,35 @@ UASTNode* parsePrecedence(UParseState *state, UASTNode *left, Precedence prec) {
 }
 
 UASTNode* expression(UParseState *state) {
-    return parsePrecedence(state, NULL, PREC_ASSIGNMENT);
+    UASTNode *node = parsePrecedence(state, NULL, PREC_ASSIGNMENT);
+
+    if (!node)
+        error(state, "Expected expression!");
+
+    return node;
 }
 
 UASTNode* statement(UParseState *state) {
-    /* TODO */
-    return NULL;
+    UASTNode *node;
+
+    /* find a statement match */
+    if (match(state, TOKEN_PRINTINT)) {
+        node = printStatement(state);
+    } else {
+        /* no statement match was found, just parse the expression */
+        node = expression(state);
+        node = newStateNode(state, node, NULL, STATE_EXPR);
+    }
+
+    return node;
+}
+
+void printState(UASTNode *node) {
+    switch(node->sType) {
+        case STATE_PRNT: printf("PRNT"); break;
+        case STATE_EXPR: printf("EXPR"); break;
+        default: break;
+    }
 }
 
 void printNode(UASTNode *node) {
@@ -185,6 +230,7 @@ void printNode(UASTNode *node) {
         case NODE_MUL: printf("MUL"); break;
         case NODE_DIV: printf("DIV"); break;
         case NODE_INTLIT: printf("[%d]", node->num); break;
+        case NODE_STATE: printState(node); break;
         default: break;
     }
 }
@@ -202,14 +248,24 @@ void printTree(UASTNode *node, int indent) {
 
 UASTNode *UP_parseSource(const char *src) {
     UParseState state;
-    UL_initLexState(&state.lstate, src);
+    UASTNode *root = NULL, *current = NULL;
 
+    UL_initLexState(&state.lstate, src);
     advance(&state);
 
-    UASTNode *tree = expression(&state);
-    printTree(tree, 16);
+    do {
+        if (root == NULL) {
+            root = statement(&state);
+            current = root;
+        } else {
+            current->right = statement(&state);
+            current = current->right;
+        }
+    } while(match(&state, TOKEN_COLON) && !isPEnd(&state));
 
-    return tree;
+    printTree(root, 16);
+
+    return root;
 }
 
 void UP_freeTree(UASTNode *tree) {

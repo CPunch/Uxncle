@@ -7,7 +7,7 @@ static const char preamble[] =
     "|0100\n";
 
 static const char postamble[] =
-    "\n;print-decimal JSR2\n"
+    "\n"
     "BRK\n"
         "@print-decimal\n"
         "\t#00 .number/started STZ\n"
@@ -32,12 +32,12 @@ void writeShortLit(FILE *out, int lit) {
     fprintf(out, "#%.4x ", lit);
 }
 
-void compileAST(FILE *out, UASTNode *node) {
+void compileExpression(FILE *out, UASTNode *node) {
     /* first, traverse down the AST recusively */
     if (node->left)
-        compileAST(out, node->left);
+        compileExpression(out, node->left);
     if (node->right)
-        compileAST(out, node->right);
+        compileExpression(out, node->right);
 
     switch(node->type) {
         case NODE_ADD: fwrite("ADD2\n", 5, 1, out); break;
@@ -47,7 +47,28 @@ void compileAST(FILE *out, UASTNode *node) {
         case NODE_INTLIT: writeShortLit(out, node->num); break;
         default:
             printf("Compiler error! unknown AST node!! [%d]\n", node->type);
-            exit(0);
+            exit(EXIT_FAILURE);
+    }
+}
+
+void compilePrintInt(FILE *out, UASTNode *node) {
+    compileExpression(out, node->left);
+    fwrite(";print-decimal JSR2 #20 .Console/char DEO\n", 42, 1, out);
+}
+
+void compileAST(FILE *out, UASTNode *node) {
+    /* STATE nodes hold the expression in node->left, and the next expression in node->right */
+    while (node && node->type == NODE_STATE) {
+        switch(node->sType) {
+            case STATE_PRNT: compilePrintInt(out, node); break;
+            case STATE_EXPR: compileExpression(out, node->left); break;
+            default:
+                printf("Compiler error! unknown Statement node!! [%d]\n", node->sType);
+                exit(EXIT_FAILURE);
+        }
+
+        /* move to the next statement */
+        node = node->right;
     }
 }
 
