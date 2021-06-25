@@ -58,12 +58,12 @@ void compilePrintInt(FILE *out, UASTNode *node) {
 
 void compileAST(FILE *out, UASTNode *node) {
     /* STATE nodes hold the expression in node->left, and the next expression in node->right */
-    while (node && node->type == NODE_STATE) {
-        switch(node->sType) {
-            case STATE_PRNT: compilePrintInt(out, node); break;
-            case STATE_EXPR: compileExpression(out, node->left); break;
+    while (node) {
+        switch(node->type) {
+            case NODE_STATE_PRNT: compilePrintInt(out, node); break;
+            case NODE_STATE_EXPR: compileExpression(out, node->left); break;
             default:
-                printf("Compiler error! unknown Statement node!! [%d]\n", node->sType);
+                printf("Compiler error! unknown Statement node!! [%d]\n", node->type);
                 exit(EXIT_FAILURE);
         }
 

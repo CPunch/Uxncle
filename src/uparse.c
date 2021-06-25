@@ -51,16 +51,10 @@ UASTNode *newNumNode(UParseState *state, UASTNode *left, UASTNode *right, int nu
     return node;
 }
 
-UASTNode *newStateNode(UParseState *state, UASTNode *left, UASTNode *right, UStateType type) {
-    UASTNode *node = newNode(state, NODE_STATE, left, right);
-    node->sType = type;
-
-    return node;
-}
-
 void errorAt(UToken *token, int line, const char *fmt, va_list args) {
     printf("Syntax error at '%.*s' on line %d\n\t", token->len, token->str, line);
     vprintf(fmt, args);
+    printf("\n");
     exit(EXIT_FAILURE);
 }
 
@@ -133,7 +127,7 @@ UASTNode* binOperator(UParseState *state, UASTNode *left, Precedence currPrec) {
 ParseRule ruleTable[] = {
     /* keywords */
     {NULL, NULL, PREC_NONE}, /* TOKEN_BYTE */
-    {NULL, NULL, PREC_NONE}, /* TOKEN_BYTE16 */
+    {NULL, NULL, PREC_NONE}, /* TOKEN_SHORT */
     {NULL, NULL, PREC_NONE}, /* TOKEN_VOID */
     {NULL, NULL, PREC_NONE}, /* TOKEN_PRINTINT */
 
@@ -163,7 +157,7 @@ ParseRule ruleTable[] = {
 UASTNode* printStatement(UParseState *state) {
     /* make our statement node & return */
     UASTNode *node = expression(state);
-    return newStateNode(state, node, NULL, STATE_PRNT);
+    return newNode(state, NODE_STATE_PRNT, node, NULL);
 }
 
 UASTNode* parsePrecedence(UParseState *state, UASTNode *left, Precedence prec) {
@@ -209,18 +203,13 @@ UASTNode* statement(UParseState *state) {
     } else {
         /* no statement match was found, just parse the expression */
         node = expression(state);
-        node = newStateNode(state, node, NULL, STATE_EXPR);
+        node = newNode(state, NODE_STATE_EXPR, node, NULL);
     }
+
+    if (!match(state, TOKEN_COLON))
+        error(state, "Expected ';'!");
 
     return node;
-}
-
-void printState(UASTNode *node) {
-    switch(node->sType) {
-        case STATE_PRNT: printf("PRNT"); break;
-        case STATE_EXPR: printf("EXPR"); break;
-        default: break;
-    }
 }
 
 void printNode(UASTNode *node) {
@@ -230,7 +219,8 @@ void printNode(UASTNode *node) {
         case NODE_MUL: printf("MUL"); break;
         case NODE_DIV: printf("DIV"); break;
         case NODE_INTLIT: printf("[%d]", node->num); break;
-        case NODE_STATE: printState(node); break;
+        case NODE_STATE_PRNT: printf("PRNT"); break;
+        case NODE_STATE_EXPR: printf("EXPR"); break;
         default: break;
     }
 }
@@ -249,6 +239,7 @@ void printTree(UASTNode *node, int indent) {
 UASTNode *UP_parseSource(const char *src) {
     UParseState state;
     UASTNode *root = NULL, *current = NULL;
+    int treeIndent = 8;
 
     UL_initLexState(&state.lstate, src);
     advance(&state);
@@ -260,11 +251,11 @@ UASTNode *UP_parseSource(const char *src) {
         } else {
             current->right = statement(&state);
             current = current->right;
+            treeIndent += 4;
         }
-    } while(match(&state, TOKEN_COLON) && !isPEnd(&state));
+    } while(!isPEnd(&state));
 
-    printTree(root, 16);
-
+    printTree(root, treeIndent);
     return root;
 }
 
