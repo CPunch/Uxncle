@@ -3,6 +3,11 @@
 
 #include "ulex.h"
 
+#define MAX_SCOPES 32
+#define MAX_LOCALS 128
+
+#define COMMON_NODE_HEADER UASTNode _node;
+
 typedef enum {
     NODE_ADD,
     NODE_SUB,
@@ -14,22 +19,58 @@ typedef enum {
             node->left holds expression tree, node->right holds the next statement
     */
     NODE_STATE_PRNT,
+    NODE_STATE_SCOPE,
+    NODE_STATE_SHORT,
+    NODE_STATE_VAR,
     NODE_STATE_EXPR,
 } UASTNodeType;
+
+typedef enum {
+    TYPE_BYTE,
+    TYPE_SHORT
+} UVarType;
+
+typedef struct {
+    UVarType type;
+    char *name;
+    int len;
+    int declared; /* if the variable can be used yet */
+} UVar;
+
+typedef struct {
+    UVar vars[MAX_LOCALS];
+    int vCount; /* count of active local variables */
+} UScope;
 
 typedef struct s_UASTNode {
     UASTNodeType type;
     struct s_UASTNode *left;
     struct s_UASTNode *right;
-    union {
-        int num;
-    };
 } UASTNode;
 
 typedef struct {
+    COMMON_NODE_HEADER;
+    int var; /* index of the UVar in the closest scope in the tree */
+} UASTVarNode;
+
+typedef struct {
+    COMMON_NODE_HEADER;
+    int num;
+} UASTIntNode;
+
+typedef struct {
+    COMMON_NODE_HEADER;
+    UScope scope;
+} UASTScopeNode;
+
+typedef struct {
+    /* lexer related info */
     ULexState lstate;
     UToken current;
     UToken previous;
+    /* scopes */
+    UScope scopes[MAX_SCOPES];
+    int sCount; /* count of active scopes */
 } UParseState;
 
 /* returns the base AST node, or NULL if a syntax error occurred */

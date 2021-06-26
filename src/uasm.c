@@ -44,7 +44,7 @@ void compileExpression(FILE *out, UASTNode *node) {
         case NODE_SUB: fwrite("SUB2\n", 5, 1, out); break;
         case NODE_MUL: fwrite("MUL2\n", 5, 1, out); break;
         case NODE_DIV: fwrite("DIV2\n", 5, 1, out); break;
-        case NODE_INTLIT: writeShortLit(out, node->num); break;
+        case NODE_INTLIT: writeShortLit(out, ((UASTIntNode*)node)->num); break;
         default:
             printf("Compiler error! unknown AST node!! [%d]\n", node->type);
             exit(EXIT_FAILURE);

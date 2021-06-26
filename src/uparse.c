@@ -35,22 +35,6 @@ int str2int(char *str, int len) {
 
 /* ==================================[[ generic helper functions ]]================================== */
 
-UASTNode *newNode(UParseState *state, UASTNodeType type, UASTNode *left, UASTNode *right) {
-    UASTNode *node = UM_realloc(NULL, sizeof(UASTNode));
-    node->type = type;
-    node->left = left;
-    node->right = right;
-
-    return node;
-}
-
-UASTNode *newNumNode(UParseState *state, UASTNode *left, UASTNode *right, int num) {
-    UASTNode *node = newNode(state, NODE_INTLIT, left, right);
-    node->num = num;
-
-    return node;
-}
-
 void errorAt(UToken *token, int line, const char *fmt, va_list args) {
     printf("Syntax error at '%.*s' on line %d\n\t", token->len, token->str, line);
     vprintf(fmt, args);
@@ -63,6 +47,59 @@ void error(UParseState *state, const char *fmt, ...) {
     va_start(args, fmt);
     errorAt(&state->previous, state->lstate.line, fmt, args);
     va_end(args);
+}
+
+UASTNode *newBaseNode(UParseState *state, size_t size, UASTNodeType type, UASTNode *left, UASTNode *right) {
+    UASTNode *node = UM_realloc(NULL, size);
+    node->type = type;
+    node->left = left;
+    node->right = right;
+
+    return node;
+}
+
+UASTNode *newNode(UParseState *state, UASTNodeType type, UASTNode *left, UASTNode *right) {
+    return newBaseNode(state, sizeof(UASTNode), type, left, right);
+}
+
+UASTNode *newNumNode(UParseState *state, UASTNode *left, UASTNode *right, int num) {
+    UASTIntNode *node = (UASTIntNode*)newBaseNode(state, sizeof(UASTIntNode), NODE_INTLIT, left, right);
+    node->num = num;
+    return (UASTNode*)node;
+}
+
+UASTNode *newScopeNode(UParseState *state, UASTNode *left, UASTNode *right, UScope *scope) {
+    UASTScopeNode *node = (UASTScopeNode*)newBaseNode(state, sizeof(UASTScopeNode), NODE_STATE_SCOPE, left, right);
+    node->scope = *scope;
+    return (UASTNode*)node;
+}
+
+UScope* newScope(UParseState *state) {
+    UScope *scope = &state->scopes[state->sCount++];
+
+    /* set the scope */
+    scope->vCount = 0;
+    return scope;
+}
+
+UScope* getScope(UParseState *state) {
+    return &state->scopes[state->sCount-1];
+}
+
+int newVar(UParseState *state, UVarType type, char *name, int length) {
+    UScope *scope = getScope(state);
+    UVar *var = &scope->vars[scope->vCount++];
+
+    /* sanity check */
+    if (scope->vCount >= MAX_LOCALS)
+        error(state, "Max local limit reached, too many locals declared in scope!");
+
+    /* set the var and return */
+    var->type = type;
+    var->name = name;
+    var->len = length;
+    var->declared = 0;
+    return scope->vCount-1;
 }
 
 void advance(UParseState *state) {
@@ -143,6 +180,7 @@ ParseRule ruleTable[] = {
     {NULL, NULL, PREC_NONE}, /* TOKEN_RIGHT_BRACKET */
     {NULL, NULL, PREC_NONE}, /* TOKEN_COLON */
     {NULL, NULL, PREC_NONE}, /* TOKEN_POUND */
+    {NULL, NULL, PREC_NONE}, /* TOKEN_EQUAL */
     {NULL, binOperator, PREC_TERM}, /* TOKEN_PLUS */
     {NULL, binOperator, PREC_TERM}, /* TOKEN_MINUS */
     {NULL, binOperator, PREC_FACTOR}, /* TOKEN_SLASH */
@@ -156,8 +194,24 @@ ParseRule ruleTable[] = {
 
 UASTNode* printStatement(UParseState *state) {
     /* make our statement node & return */
-    UASTNode *node = expression(state);
-    return newNode(state, NODE_STATE_PRNT, node, NULL);
+    return newNode(state, NODE_STATE_PRNT, expression(state), NULL);
+}
+
+UASTNode* shortStatement(UParseState *state) {
+    UASTVarNode *node;
+    int var;
+
+    /* consume the identifer */
+    if (!match(state, TOKEN_IDENT))
+        error(state, "Expected identifer!");
+
+    /* define the variable */
+    var = newVar(state, TYPE_SHORT, state->previous.str, state->previous.len);
+
+    /* if it's assigned a value, evaluate the expression & set the left node, if not set it to NULL */
+    node = (UASTVarNode*)newBaseNode(state, sizeof(UASTVarNode), NODE_STATE_SHORT, (match(state, TOKEN_EQUAL)) ? expression(state) : NULL, NULL);
+    node->var = var;
+    return (UASTNode*)node;
 }
 
 UASTNode* parsePrecedence(UParseState *state, UASTNode *left, Precedence prec) {
@@ -218,8 +272,11 @@ void printNode(UASTNode *node) {
         case NODE_SUB: printf("SUB"); break;
         case NODE_MUL: printf("MUL"); break;
         case NODE_DIV: printf("DIV"); break;
-        case NODE_INTLIT: printf("[%d]", node->num); break;
+        case NODE_INTLIT: printf("[%d]", ((UASTIntNode*)node)->num); break;
         case NODE_STATE_PRNT: printf("PRNT"); break;
+        case NODE_STATE_SCOPE: printf("SCPE"); break;
+        case NODE_STATE_SHORT: printf("SHRT"); break;
+        case NODE_STATE_VAR: printf("VAR[%d]", ((UASTVarNode*)node)->var); break;
         case NODE_STATE_EXPR: printf("EXPR"); break;
         default: break;
     }
@@ -240,6 +297,8 @@ UASTNode *UP_parseSource(const char *src) {
     UParseState state;
     UASTNode *root = NULL, *current = NULL;
     int treeIndent = 8;
+
+    state.sCount = 1;
 
     UL_initLexState(&state.lstate, src);
     advance(&state);

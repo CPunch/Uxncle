@@ -20,6 +20,7 @@ typedef enum {
     TOKEN_RIGHT_BRACKET,
     TOKEN_COLON,
     TOKEN_POUND,
+    TOKEN_EQUAL,
     TOKEN_PLUS,
     TOKEN_MINUS,
     TOKEN_SLASH,
