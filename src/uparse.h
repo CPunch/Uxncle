@@ -13,16 +13,17 @@ typedef enum {
     NODE_SUB,
     NODE_MUL,
     NODE_DIV,
-    NODE_INTLIT,
+    NODE_SHORTLIT,
+    NODE_VAR,
     /* 
         statement nodes below
             node->left holds expression tree, node->right holds the next statement
     */
     NODE_STATE_PRNT,
-    NODE_STATE_SCOPE,
     NODE_STATE_SHORT,
-    NODE_STATE_VAR,
     NODE_STATE_EXPR,
+    /* scopes are different, node->left holds the statement tree for the scope, node->right holds the next statement */
+    NODE_STATE_SCOPE,
 } UASTNodeType;
 
 typedef enum {
@@ -34,6 +35,8 @@ typedef struct {
     UVarType type;
     char *name;
     int len;
+    int scope;
+    int var;
     int declared; /* if the variable can be used yet */
 } UVar;
 
@@ -50,7 +53,8 @@ typedef struct s_UASTNode {
 
 typedef struct {
     COMMON_NODE_HEADER;
-    int var; /* index of the UVar in the closest scope in the tree */
+    int var; /* index of the UVar */
+    int scope; /* index of the scope */
 } UASTVarNode;
 
 typedef struct {

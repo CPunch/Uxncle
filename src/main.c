@@ -3,9 +3,9 @@
 
 int main() {
     UASTNode *tree = UP_parseSource(
-        "prntint 6 + 2 * 21 + 3 * 6;\n" 
-        "prntint 6 / 2;\n" 
-        "prntint 24;"
+        "short a = 2;\n" 
+        "short b = 6;\n" 
+        "prntint b / a;"
     );
     UA_genTal(tree, fopen("bin/out.tal", "w"));
 

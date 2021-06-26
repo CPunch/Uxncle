@@ -20,6 +20,7 @@ typedef struct {
 
 UASTNode* parsePrecedence(UParseState *state, UASTNode *left, Precedence prec);
 UASTNode* expression(UParseState *state);
+UASTNode* statement(UParseState *state);
 ParseRule ruleTable[];
 
 int str2int(char *str, int len) {
@@ -63,7 +64,7 @@ UASTNode *newNode(UParseState *state, UASTNodeType type, UASTNode *left, UASTNod
 }
 
 UASTNode *newNumNode(UParseState *state, UASTNode *left, UASTNode *right, int num) {
-    UASTIntNode *node = (UASTIntNode*)newBaseNode(state, sizeof(UASTIntNode), NODE_INTLIT, left, right);
+    UASTIntNode *node = (UASTIntNode*)newBaseNode(state, sizeof(UASTIntNode), NODE_SHORTLIT, left, right);
     node->num = num;
     return (UASTNode*)node;
 }
@@ -77,18 +78,42 @@ UASTNode *newScopeNode(UParseState *state, UASTNode *left, UASTNode *right, USco
 UScope* newScope(UParseState *state) {
     UScope *scope = &state->scopes[state->sCount++];
 
-    /* set the scope */
+    /* sanity check */
+    if (state->sCount >= MAX_SCOPES)
+        error(state, "Max scope limit reached!");
+
     scope->vCount = 0;
     return scope;
+}
+
+void endScope(UParseState *state) {
+    state->sCount--;
 }
 
 UScope* getScope(UParseState *state) {
     return &state->scopes[state->sCount-1];
 }
 
+UVar* findVar(UParseState *state, char *name, int length) {
+    int i, z;
+
+    /* walk the scopes and variables */
+    for (i = state->sCount-1; i >= 0; i--) 
+        for (z = state->scopes[i].vCount-1; z >= 0; z--)
+            if (state->scopes[i].vars[z].len == length && !memcmp(state->scopes[i].vars[z].name, name, length))
+                return &state->scopes[i].vars[z];
+
+    /* var wasn't found */
+    return NULL;
+}
+
 int newVar(UParseState *state, UVarType type, char *name, int length) {
     UScope *scope = getScope(state);
     UVar *var = &scope->vars[scope->vCount++];
+
+    /* make sure the variable name wasn't already in use */
+    if (findVar(state, name, length) != NULL)
+        error(state, "Variable '%.*s' already declared!", length, name);
 
     /* sanity check */
     if (scope->vCount >= MAX_LOCALS)
@@ -98,6 +123,8 @@ int newVar(UParseState *state, UVarType type, char *name, int length) {
     var->type = type;
     var->name = name;
     var->len = length;
+    var->scope = state->sCount-1;
+    var->var = scope->vCount-1;
     var->declared = 0;
     return scope->vCount-1;
 }
@@ -161,6 +188,20 @@ UASTNode* binOperator(UParseState *state, UASTNode *left, Precedence currPrec) {
     return newNode(state, type, left, right);
 }
 
+UASTNode* identifer(UParseState *state, UASTNode *left, Precedence currPrec) {
+    UASTVarNode *nVar;
+    UVar *var = findVar(state, state->previous.str, state->previous.len);
+
+    if (var == NULL)
+        error(state, "Identifer '%.*s' not found!", state->previous.len, state->previous.str);
+
+    /* finally, create the Var node */
+    nVar = (UASTVarNode*)newBaseNode(state, sizeof(UASTVarNode), NODE_VAR, NULL, NULL);
+    nVar->var = var->var;
+    nVar->scope = var->scope;
+    return (UASTNode*)nVar;
+}
+
 ParseRule ruleTable[] = {
     /* keywords */
     {NULL, NULL, PREC_NONE}, /* TOKEN_BYTE */
@@ -169,7 +210,7 @@ ParseRule ruleTable[] = {
     {NULL, NULL, PREC_NONE}, /* TOKEN_PRINTINT */
 
     /* literals */
-    {NULL, NULL, PREC_NONE}, /* TOKEN_IDENT */
+    {identifer, NULL, PREC_LITERAL}, /* TOKEN_IDENT */
     {number, NULL, PREC_LITERAL}, /* TOKEN_NUMBER */
 
     {NULL, NULL, PREC_NONE}, /* TOKEN_LEFT_BRACE */
@@ -189,30 +230,6 @@ ParseRule ruleTable[] = {
     {NULL, NULL, PREC_NONE}, /* TOKEN_EOF */
     {NULL, NULL, PREC_NONE}, /* TOKEN_ERR */
 };
-
-/* ==================================[[ parse statement functions ]]================================== */
-
-UASTNode* printStatement(UParseState *state) {
-    /* make our statement node & return */
-    return newNode(state, NODE_STATE_PRNT, expression(state), NULL);
-}
-
-UASTNode* shortStatement(UParseState *state) {
-    UASTVarNode *node;
-    int var;
-
-    /* consume the identifer */
-    if (!match(state, TOKEN_IDENT))
-        error(state, "Expected identifer!");
-
-    /* define the variable */
-    var = newVar(state, TYPE_SHORT, state->previous.str, state->previous.len);
-
-    /* if it's assigned a value, evaluate the expression & set the left node, if not set it to NULL */
-    node = (UASTVarNode*)newBaseNode(state, sizeof(UASTVarNode), NODE_STATE_SHORT, (match(state, TOKEN_EQUAL)) ? expression(state) : NULL, NULL);
-    node->var = var;
-    return (UASTNode*)node;
-}
 
 UASTNode* parsePrecedence(UParseState *state, UASTNode *left, Precedence prec) {
     ParseFunc func;
@@ -239,6 +256,63 @@ UASTNode* parsePrecedence(UParseState *state, UASTNode *left, Precedence prec) {
     return left;
 }
 
+/* ==================================[[ parse statement functions ]]================================== */
+
+UASTNode* parseScope(UParseState *state, int expectBrace) {
+    UASTNode *root = NULL, *current = NULL;
+
+    do {
+        if (root == NULL) {
+            root = statement(state);
+            current = root;
+        } else {
+            current->right = statement(state);
+            current = current->right;
+        }
+    } while(!isPEnd(state) && (!expectBrace || !check(state, TOKEN_RIGHT_BRACE)));
+
+    if (expectBrace && !match(state, TOKEN_RIGHT_BRACE))
+        error(state, "Expected '}' to end scope!");
+
+    return root;
+}
+
+UASTNode* printStatement(UParseState *state) {
+    /* make our statement node & return */
+    return newNode(state, NODE_STATE_PRNT, expression(state), NULL);
+}
+
+UASTNode* shortStatement(UParseState *state) {
+    UASTVarNode *node;
+    int var;
+
+    /* consume the identifer */
+    if (!match(state, TOKEN_IDENT))
+        error(state, "Expected identifer!");
+
+    /* define the variable */
+    var = newVar(state, TYPE_SHORT, state->previous.str, state->previous.len);
+
+    /* if it's assigned a value, evaluate the expression & set the left node, if not set it to NULL */
+    node = (UASTVarNode*)newBaseNode(state, sizeof(UASTVarNode), NODE_STATE_SHORT, (match(state, TOKEN_EQUAL)) ? expression(state) : NULL, NULL);
+    node->var = var;
+    node->scope = state->sCount-1;
+    return (UASTNode*)node;
+}
+
+UASTNode* scopeStatement(UParseState *state) {
+    UASTScopeNode *node;
+    UScope *scope = newScope(state);
+
+    /* create scope node and copy the finished scope struct */
+    node = (UASTScopeNode*)newBaseNode(state, sizeof(UASTScopeNode), NODE_STATE_SCOPE, parseScope(state, 1), NULL);
+    node->scope = *scope;
+
+    endScope(state);
+
+    return (UASTNode*)node;
+}
+
 UASTNode* expression(UParseState *state) {
     UASTNode *node = parsePrecedence(state, NULL, PREC_ASSIGNMENT);
 
@@ -254,6 +328,10 @@ UASTNode* statement(UParseState *state) {
     /* find a statement match */
     if (match(state, TOKEN_PRINTINT)) {
         node = printStatement(state);
+    } else if (match(state, TOKEN_SHORT)) {
+        node = shortStatement(state);
+    } else if (match(state, TOKEN_LEFT_BRACE)) {
+        node = scopeStatement(state);
     } else {
         /* no statement match was found, just parse the expression */
         node = expression(state);
@@ -272,11 +350,11 @@ void printNode(UASTNode *node) {
         case NODE_SUB: printf("SUB"); break;
         case NODE_MUL: printf("MUL"); break;
         case NODE_DIV: printf("DIV"); break;
-        case NODE_INTLIT: printf("[%d]", ((UASTIntNode*)node)->num); break;
+        case NODE_SHORTLIT: printf("[%d]", ((UASTIntNode*)node)->num); break;
         case NODE_STATE_PRNT: printf("PRNT"); break;
         case NODE_STATE_SCOPE: printf("SCPE"); break;
         case NODE_STATE_SHORT: printf("SHRT"); break;
-        case NODE_STATE_VAR: printf("VAR[%d]", ((UASTVarNode*)node)->var); break;
+        case NODE_VAR: printf("VAR[%d]", ((UASTVarNode*)node)->var); break;
         case NODE_STATE_EXPR: printf("EXPR"); break;
         default: break;
     }
@@ -295,27 +373,22 @@ void printTree(UASTNode *node, int indent) {
 
 UASTNode *UP_parseSource(const char *src) {
     UParseState state;
-    UASTNode *root = NULL, *current = NULL;
-    int treeIndent = 8;
-
-    state.sCount = 1;
+    UASTScopeNode *root = NULL;
+    UScope *scope;
+    int treeIndent = 16;
 
     UL_initLexState(&state.lstate, src);
     advance(&state);
+    state.sCount = 0;
+    scope = newScope(&state);
 
-    do {
-        if (root == NULL) {
-            root = statement(&state);
-            current = root;
-        } else {
-            current->right = statement(&state);
-            current = current->right;
-            treeIndent += 4;
-        }
-    } while(!isPEnd(&state));
+    /* create scope node and copy the finished scope struct */
+    root = (UASTScopeNode*)newBaseNode(&state, sizeof(UASTScopeNode), NODE_STATE_SCOPE, parseScope(&state, 0), NULL);
+    root->scope = *scope;
 
-    printTree(root, treeIndent);
-    return root;
+    endScope(&state);
+    printTree((UASTNode*)root, treeIndent);
+    return (UASTNode*)root;
 }
 
 void UP_freeTree(UASTNode *tree) {
