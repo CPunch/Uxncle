@@ -28,7 +28,8 @@ typedef enum {
 
 typedef enum {
     TYPE_BYTE,
-    TYPE_SHORT
+    TYPE_SHORT,
+    TYPE_NONE
 } UVarType;
 
 typedef struct {
@@ -76,6 +77,8 @@ typedef struct {
     UScope scopes[MAX_SCOPES];
     int sCount; /* count of active scopes */
 } UParseState;
+
+const char* getTypeName(UVarType type);
 
 /* returns the base AST node, or NULL if a syntax error occurred */
 UASTNode *UP_parseSource(const char *src);

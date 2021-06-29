@@ -112,6 +112,7 @@ uint16_t getSize(UCompState *state, UVar *var) {
         case TYPE_SHORT: return 2;
         default:
             cError(state, "unknown type! [%d]", var->type);
+            return 0;
     }
 }
 
@@ -171,9 +172,25 @@ void setShortVar(UCompState *state, int scope, int var) {
     state->pushed -= 4; /* pops the offset (short) & the value (short) */
 }
 
-void compileVar(UCompState *state, UASTNode *node) {
+UVar* getVarByID(UCompState *state, int scope, int var) {
+    return &state->scopes[scope]->vars[var];
+}
+
+UVarType compileVar(UCompState *state, UASTNode *node) {
     UASTVarNode *var = (UASTVarNode*)node;
-    getShortVar(state, var->scope, var->var);
+    UVar *rawVar = getVarByID(state, var->scope, var->var);
+
+    switch(rawVar->type) {
+        case TYPE_SHORT: getShortVar(state, var->scope, var->var); break;
+        default:
+            cError(state, "Unknown variable type! [%d]", rawVar->type);
+    }
+    
+    return rawVar->type;
+}
+
+int compareVarTypes(UCompState *state, UVarType t1, UVarType t2) {
+    return t1 == t2;
 }
 
 /* ==================================[[ arithmetic ]]================================== */
@@ -183,23 +200,37 @@ void cShortArith(UCompState *state, const char *instr) {
     state->pushed -= 2;
 }
 
-void compileExpression(UCompState *state, UASTNode *node) {
+void doArith(UCompState *state, const char *instr, UVarType type) {
+    switch(type) {
+        case TYPE_SHORT: cShortArith(state, instr); break;
+        default:
+            cError(state, "Unknown variable type! [%d]", type);
+    }
+}
+
+UVarType compileExpression(UCompState *state, UASTNode *node) {
+    UVarType lType = TYPE_NONE, rType = TYPE_NONE;
     /* first, traverse down the AST recusively */
     if (node->left)
-        compileExpression(state, node->left);
+        lType = compileExpression(state, node->left);
     if (node->right)
-        compileExpression(state, node->right);
+        rType = compileExpression(state, node->right);
+
+    if (lType != TYPE_NONE && rType != TYPE_NONE && !compareVarTypes(state, lType, rType))
+        cError(state, "lType '%s' doesn't match rType '%s'!", getTypeName(lType), getTypeName(rType));
 
     switch(node->type) {
-        case NODE_ADD: cShortArith(state, "ADD"); break;
-        case NODE_SUB: cShortArith(state, "SUB"); break;
-        case NODE_MUL: cShortArith(state, "MUL"); break;
-        case NODE_DIV: cShortArith(state, "DIV"); break;
-        case NODE_SHORTLIT: writeShortLit(state, ((UASTIntNode*)node)->num); break;
-        case NODE_VAR: compileVar(state, node); break;
+        case NODE_ADD: doArith(state, "ADD", lType); break;
+        case NODE_SUB: doArith(state, "SUB", lType); break;
+        case NODE_MUL: doArith(state, "MUL", lType); break;
+        case NODE_DIV: doArith(state, "DIV", lType); break;
+        case NODE_SHORTLIT: writeShortLit(state, ((UASTIntNode*)node)->num); return TYPE_SHORT; break;
+        case NODE_VAR: return compileVar(state, node); break;
         default:
             cError(state, "unknown AST node!! [%d]\n", node->type);
     }
+
+    return lType;
 }
 
 void compilePrintInt(UCompState *state, UASTNode *node) {
@@ -208,10 +239,15 @@ void compilePrintInt(UCompState *state, UASTNode *node) {
 }
 
 void compileShort(UCompState *state, UASTNode *node) {
+    UVarType type;
     UASTVarNode *var = (UASTVarNode*)node;
+    UVar *rawVar = getVarByID(state, var->scope, var->var);
+
     /* if there's no assignment, the default value will be scary undefined memory :O */
     if (node->left) {
-        compileExpression(state, node->left);
+        type = compileExpression(state, node->left);
+        if (type != TYPE_SHORT)
+            cError(state, "Cannot assign type '%s' to %.*s of type 'short'", getTypeName(type), rawVar->len, rawVar->name);
         setShortVar(state, var->scope, var->var);
     }
 }

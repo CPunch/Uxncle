@@ -371,6 +371,15 @@ void printTree(UASTNode *node, int indent) {
         printTree(node->right, indent+5);
 }
 
+const char* getTypeName(UVarType type) {
+    switch(type) {
+        case TYPE_SHORT: return "short";
+        case TYPE_BYTE: return "byte";
+        default:
+            return "<errtype>";
+    }
+}
+
 UASTNode *UP_parseSource(const char *src) {
     UParseState state;
     UASTScopeNode *root = NULL;
