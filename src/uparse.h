@@ -15,6 +15,7 @@ typedef enum {
     NODE_DIV,
     NODE_SHORTLIT,
     NODE_VAR,
+    NODE_ASSIGN, /* node->left holds Var node, node->right holds expression */
     /* 
         statement nodes below
             node->left holds expression tree, node->right holds the next statement

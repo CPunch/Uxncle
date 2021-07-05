@@ -18,10 +18,6 @@ static const char preamble[] =
         /* setup mem lib */
         ";uxncle-heap .uxncle/heap STZ2\n";
 
-/* TODO:
-    - write a thin library to handle heap allocation & deallocation. (we'll need this to store temporary values in scopes)
-*/
-
 static const char postamble[] =
     "\n"
     "BRK\n"
@@ -83,6 +79,7 @@ static const char postamble[] =
     "|ffff &end";
 
 void compileAST(UCompState *state, UASTNode *node);
+UVarType compileExpression(UCompState *state, UASTNode *node);
 
 /* ==================================[[ generic helper functions ]]================================== */
 
@@ -164,6 +161,10 @@ void getShortVar(UCompState *state, int scope, int var) {
     fprintf(state->out, ";peek-uxncle-short JSR2\n"); /* call the mem lib */
 }
 
+UVar* getVarByID(UCompState *state, int scope, int var) {
+    return &state->scopes[scope]->vars[var];
+}
+
 void setShortVar(UCompState *state, int scope, int var) {
     uint16_t offsetAddr = getOffset(state, scope, var);
 
@@ -172,21 +173,29 @@ void setShortVar(UCompState *state, int scope, int var) {
     state->pushed -= 4; /* pops the offset (short) & the value (short) */
 }
 
-UVar* getVarByID(UCompState *state, int scope, int var) {
-    return &state->scopes[scope]->vars[var];
+void setVar(UCompState *state, int scope, int var, UVarType type) {
+    switch(type) {
+        case TYPE_SHORT: setShortVar(state, scope, var); break;
+        default:
+            cError(state, "Unimplemented setter for type '%s'", getTypeName(type));
+    }
+}
+
+UVarType getVar(UCompState *state, int scope, int var) {
+    UVar *rawVar = getVarByID(state, scope, var);
+
+    switch(rawVar->type) {
+        case TYPE_SHORT: getShortVar(state, scope, var); break;
+        default:
+            cError(state, "Unimplemented getter for type '%s'", getTypeName(rawVar->type));
+    }
+    
+    return rawVar->type;
 }
 
 UVarType compileVar(UCompState *state, UASTNode *node) {
     UASTVarNode *var = (UASTVarNode*)node;
-    UVar *rawVar = getVarByID(state, var->scope, var->var);
-
-    switch(rawVar->type) {
-        case TYPE_SHORT: getShortVar(state, var->scope, var->var); break;
-        default:
-            cError(state, "Unknown variable type! [%d]", rawVar->type);
-    }
-    
-    return rawVar->type;
+    return getVar(state, var->scope, var->var);
 }
 
 int compareVarTypes(UCompState *state, UVarType t1, UVarType t2) {
@@ -194,6 +203,30 @@ int compareVarTypes(UCompState *state, UVarType t1, UVarType t2) {
 }
 
 /* ==================================[[ arithmetic ]]================================== */
+
+void pop(UCompState *state, int size) {
+    int i;
+
+    /* use POP2 for as much as we can */
+    for (i = size; i-2 >= 0; i-=2) {
+        fprintf(state->out, "POP2\n");
+    }
+
+    /* we might have a left over byte that still needs to be popped */
+    if (i == 1)
+        fprintf(state->out, "POP\n");
+    
+    state->pushed-=size;
+}
+
+void dupValue(UCompState *state, UVarType type) {
+    switch(type) {
+        case TYPE_SHORT: fprintf(state->out, "DUP2\n"); state->pushed+=2; break;
+        case TYPE_BYTE: fprintf(state->out, "DUP\n"); state->pushed++; break;
+        default:
+            cError(state, "Unknown variable type! [%d]", type);
+    }
+}
 
 void cShortArith(UCompState *state, const char *instr) {
     fprintf(state->out, "%s2\n", instr);
@@ -208,8 +241,34 @@ void doArith(UCompState *state, const char *instr, UVarType type) {
     }
 }
 
+UVarType compileAssignment(UCompState *state, UASTNode *node) {
+    UASTVarNode *nVar = (UASTVarNode*)node->left;
+    UVar *rawVar = getVarByID(state, nVar->scope, nVar->var);
+    UVarType expType;
+
+    /* get the value of the expression */
+    expType = compileExpression(state, node->right);
+
+    /* make sure we can assign the value of this expression to this variable */
+    if (!compareVarTypes(state, expType, rawVar->type))
+        cError(state, "Cannot assign type '%s' to '%.*s' of type '%s'", getTypeName(expType), rawVar->len, rawVar->name, getTypeName(rawVar->type));
+
+    /* duplicate the value on the stack */
+    dupValue(state, expType);
+
+    /* assign the copy to the variable, leaving a copy on the stack for the expression */
+    setVar(state, nVar->scope, nVar->var, expType);
+
+    return expType;
+}
+
 UVarType compileExpression(UCompState *state, UASTNode *node) {
     UVarType lType = TYPE_NONE, rType = TYPE_NONE;
+
+    /* assignments are special, they're like statements but can be inside of expressions */
+    if (node->type == NODE_ASSIGN)
+        return compileAssignment(state, node);
+
     /* first, traverse down the AST recusively */
     if (node->left)
         lType = compileExpression(state, node->left);
@@ -236,6 +295,7 @@ UVarType compileExpression(UCompState *state, UASTNode *node) {
 void compilePrintInt(UCompState *state, UASTNode *node) {
     compileExpression(state, node->left);
     fwrite(";print-decimal JSR2 #20 .Console/char DEO\n", 42, 1, state->out);
+    state->pushed-=2;
 }
 
 void compileShort(UCompState *state, UASTNode *node) {
@@ -273,6 +333,9 @@ void compileAST(UCompState *state, UASTNode *node) {
             default:
                 cError(state, "unknown statement node!! [%d]\n", node->type);
         }
+
+        /* clean the stack */
+        pop(state, state->pushed);
 
         /* move to the next statement */
         node = node->right;

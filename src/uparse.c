@@ -168,6 +168,14 @@ UASTNode* number(UParseState *state, UASTNode *left, Precedence currPrec) {
     return newNumNode(state, NULL, NULL, num);
 }
 
+UASTNode* assignment(UParseState *state, UASTNode *left, Precedence currPrec) {
+    if (left->type != NODE_VAR)
+        error(state, "Expected identifier before '='!");
+
+    UASTNode *right = expression(state);
+    return newNode(state, NODE_ASSIGN, left, right);
+}
+
 UASTNode* binOperator(UParseState *state, UASTNode *left, Precedence currPrec) {
     UASTNodeType type;
     UASTNode *right;
@@ -221,7 +229,7 @@ ParseRule ruleTable[] = {
     {NULL, NULL, PREC_NONE}, /* TOKEN_RIGHT_BRACKET */
     {NULL, NULL, PREC_NONE}, /* TOKEN_COLON */
     {NULL, NULL, PREC_NONE}, /* TOKEN_POUND */
-    {NULL, NULL, PREC_NONE}, /* TOKEN_EQUAL */
+    {NULL, assignment, PREC_ASSIGNMENT}, /* TOKEN_EQUAL */
     {NULL, binOperator, PREC_TERM}, /* TOKEN_PLUS */
     {NULL, binOperator, PREC_TERM}, /* TOKEN_MINUS */
     {NULL, binOperator, PREC_FACTOR}, /* TOKEN_SLASH */
@@ -350,6 +358,7 @@ void printNode(UASTNode *node) {
         case NODE_SUB: printf("SUB"); break;
         case NODE_MUL: printf("MUL"); break;
         case NODE_DIV: printf("DIV"); break;
+        case NODE_ASSIGN: printf("ASSIGN"); break;
         case NODE_SHORTLIT: printf("[%d]", ((UASTIntNode*)node)->num); break;
         case NODE_STATE_PRNT: printf("PRNT"); break;
         case NODE_STATE_SCOPE: printf("SCPE"); break;

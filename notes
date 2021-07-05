@@ -10,4 +10,5 @@ ADD: left = 5, right = MUL
 
   ADD
 5     MUL
-    3     2
+    3     ASSIGN
+        B        2
