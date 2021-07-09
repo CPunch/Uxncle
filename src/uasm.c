@@ -95,12 +95,12 @@ void cError(UCompState *state, const char *fmt, ...) {
 
 void writeIntLit(UCompState *state, uint16_t lit) {
     fprintf(state->out, "#%.4x ", lit);
-    state->pushed += 2;
+    state->pushed += SIZE_INT;
 }
 
 void writeByteLit(UCompState *state, uint8_t lit) {
     fprintf(state->out, "#%.2x ", lit);
-    state->pushed++;
+    state->pushed += SIZE_CHAR;
 }
 
 uint16_t getSize(UCompState *state, UVar *var) {
@@ -128,14 +128,14 @@ void pushScope(UCompState *state, UScope *scope) {
     state->scopes[state->sCount++] = scope;
     writeIntLit(state, getScopeSize(state, scope));
     fwrite(";alloc-uxncle JSR2\n", 19, 1, state->out);
-    state->pushed -= 2;
+    state->pushed -= SIZE_INT;
 }
 
 void popScope(UCompState *state) {
     UScope *scope = state->scopes[--state->sCount];
     writeIntLit(state, getScopeSize(state, scope));
     fwrite(";dealloc-uxncle JSR2\n", 21, 1, state->out);
-    state->pushed -= 2;
+    state->pushed -= SIZE_INT;
 }
 
 uint16_t getOffset(UCompState *state, int scope, int var) {
@@ -170,7 +170,7 @@ void setIntVar(UCompState *state, int scope, int var) {
 
     writeIntLit(state, offsetAddr); /* write the offset */
     fprintf(state->out, ";poke-uxncle-short JSR2\n"); /* call the mem lib */
-    state->pushed -= 4; /* pops the offset (short) & the value (short) */
+    state->pushed -= SIZE_INT + SIZE_INT; /* pops the offset (short) & the value (short) */
 }
 
 void setVar(UCompState *state, int scope, int var, UVarType type) {
@@ -221,8 +221,8 @@ void pop(UCompState *state, int size) {
 
 void dupValue(UCompState *state, UVarType type) {
     switch(type) {
-        case TYPE_INT: fprintf(state->out, "DUP2\n"); state->pushed+=2; break;
-        case TYPE_CHAR: fprintf(state->out, "DUP\n"); state->pushed++; break;
+        case TYPE_INT: fprintf(state->out, "DUP2\n"); state->pushed+=SIZE_INT; break;
+        case TYPE_CHAR: fprintf(state->out, "DUP\n"); state->pushed+=SIZE_CHAR; break;
         default:
             cError(state, "Unknown variable type! [%d]", type);
     }
@@ -230,7 +230,8 @@ void dupValue(UCompState *state, UVarType type) {
 
 void cIntArith(UCompState *state, const char *instr) {
     fprintf(state->out, "%s2\n", instr);
-    state->pushed -= 2;
+    /* arith operations pop 2 shorts, and push 1 short, so in total we have 1 short less on the stack */
+    state->pushed -= SIZE_INT;
 }
 
 void doArith(UCompState *state, const char *instr, UVarType type) {
@@ -295,7 +296,7 @@ UVarType compileExpression(UCompState *state, UASTNode *node) {
 void compilePrintInt(UCompState *state, UASTNode *node) {
     compileExpression(state, node->left);
     fwrite(";print-decimal JSR2 #20 .Console/char DEO\n", 42, 1, state->out);
-    state->pushed-=2;
+    state->pushed -= SIZE_INT;
 }
 
 void compileInt(UCompState *state, UASTNode *node) {
