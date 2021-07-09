@@ -1,6 +1,6 @@
 CC=clang
-CFLAGS=-fPIE -Wall -g -fsanitize=address -O2 -Isrc -std=c89
-LDFLAGS=-lm -fsanitize=address
+CFLAGS=-fPIE -Wall -O2 -Isrc -std=c89
+LDFLAGS=-lm #-fsanitize=address
 OUT=bin/uxncle
 
 CHDR=\

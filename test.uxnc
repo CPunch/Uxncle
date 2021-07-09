@@ -1,4 +1,4 @@
-byte sub(byte a, byte b) {
+int sub(int a, int b) {
     return a - b;
 }
 

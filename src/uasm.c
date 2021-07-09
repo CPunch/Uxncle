@@ -93,7 +93,7 @@ void cError(UCompState *state, const char *fmt, ...) {
     exit(EXIT_FAILURE);
 }
 
-void writeShortLit(UCompState *state, uint16_t lit) {
+void writeIntLit(UCompState *state, uint16_t lit) {
     fprintf(state->out, "#%.4x ", lit);
     state->pushed += 2;
 }
@@ -105,8 +105,8 @@ void writeByteLit(UCompState *state, uint8_t lit) {
 
 uint16_t getSize(UCompState *state, UVar *var) {
     switch(var->type) {
-        case TYPE_BYTE: return 1;
-        case TYPE_SHORT: return 2;
+        case TYPE_CHAR: return 1;
+        case TYPE_INT: return 2;
         default:
             cError(state, "unknown type! [%d]", var->type);
             return 0;
@@ -126,14 +126,14 @@ uint16_t getScopeSize(UCompState *state, UScope *scope) {
 
 void pushScope(UCompState *state, UScope *scope) {
     state->scopes[state->sCount++] = scope;
-    writeShortLit(state, getScopeSize(state, scope));
+    writeIntLit(state, getScopeSize(state, scope));
     fwrite(";alloc-uxncle JSR2\n", 19, 1, state->out);
     state->pushed -= 2;
 }
 
 void popScope(UCompState *state) {
     UScope *scope = state->scopes[--state->sCount];
-    writeShortLit(state, getScopeSize(state, scope));
+    writeIntLit(state, getScopeSize(state, scope));
     fwrite(";dealloc-uxncle JSR2\n", 21, 1, state->out);
     state->pushed -= 2;
 }
@@ -154,10 +154,10 @@ uint16_t getOffset(UCompState *state, int scope, int var) {
     return offsetAddr;
 }
 
-void getShortVar(UCompState *state, int scope, int var) {
+void getIntVar(UCompState *state, int scope, int var) {
     uint16_t offsetAddr = getOffset(state, scope, var);
 
-    writeShortLit(state, offsetAddr); /* write the offset */
+    writeIntLit(state, offsetAddr); /* write the offset */
     fprintf(state->out, ";peek-uxncle-short JSR2\n"); /* call the mem lib */
 }
 
@@ -165,17 +165,17 @@ UVar* getVarByID(UCompState *state, int scope, int var) {
     return &state->scopes[scope]->vars[var];
 }
 
-void setShortVar(UCompState *state, int scope, int var) {
+void setIntVar(UCompState *state, int scope, int var) {
     uint16_t offsetAddr = getOffset(state, scope, var);
 
-    writeShortLit(state, offsetAddr); /* write the offset */
+    writeIntLit(state, offsetAddr); /* write the offset */
     fprintf(state->out, ";poke-uxncle-short JSR2\n"); /* call the mem lib */
     state->pushed -= 4; /* pops the offset (short) & the value (short) */
 }
 
 void setVar(UCompState *state, int scope, int var, UVarType type) {
     switch(type) {
-        case TYPE_SHORT: setShortVar(state, scope, var); break;
+        case TYPE_INT: setIntVar(state, scope, var); break;
         default:
             cError(state, "Unimplemented setter for type '%s'", getTypeName(type));
     }
@@ -185,7 +185,7 @@ UVarType getVar(UCompState *state, int scope, int var) {
     UVar *rawVar = getVarByID(state, scope, var);
 
     switch(rawVar->type) {
-        case TYPE_SHORT: getShortVar(state, scope, var); break;
+        case TYPE_INT: getIntVar(state, scope, var); break;
         default:
             cError(state, "Unimplemented getter for type '%s'", getTypeName(rawVar->type));
     }
@@ -221,21 +221,21 @@ void pop(UCompState *state, int size) {
 
 void dupValue(UCompState *state, UVarType type) {
     switch(type) {
-        case TYPE_SHORT: fprintf(state->out, "DUP2\n"); state->pushed+=2; break;
-        case TYPE_BYTE: fprintf(state->out, "DUP\n"); state->pushed++; break;
+        case TYPE_INT: fprintf(state->out, "DUP2\n"); state->pushed+=2; break;
+        case TYPE_CHAR: fprintf(state->out, "DUP\n"); state->pushed++; break;
         default:
             cError(state, "Unknown variable type! [%d]", type);
     }
 }
 
-void cShortArith(UCompState *state, const char *instr) {
+void cIntArith(UCompState *state, const char *instr) {
     fprintf(state->out, "%s2\n", instr);
     state->pushed -= 2;
 }
 
 void doArith(UCompState *state, const char *instr, UVarType type) {
     switch(type) {
-        case TYPE_SHORT: cShortArith(state, instr); break;
+        case TYPE_INT: cIntArith(state, instr); break;
         default:
             cError(state, "Unknown variable type! [%d]", type);
     }
@@ -283,7 +283,7 @@ UVarType compileExpression(UCompState *state, UASTNode *node) {
         case NODE_SUB: doArith(state, "SUB", lType); break;
         case NODE_MUL: doArith(state, "MUL", lType); break;
         case NODE_DIV: doArith(state, "DIV", lType); break;
-        case NODE_SHORTLIT: writeShortLit(state, ((UASTIntNode*)node)->num); return TYPE_SHORT; break;
+        case NODE_INTLIT: writeIntLit(state, ((UASTIntNode*)node)->num); return TYPE_INT; break;
         case NODE_VAR: return compileVar(state, node); break;
         default:
             cError(state, "unknown AST node!! [%d]\n", node->type);
@@ -298,7 +298,7 @@ void compilePrintInt(UCompState *state, UASTNode *node) {
     state->pushed-=2;
 }
 
-void compileShort(UCompState *state, UASTNode *node) {
+void compileInt(UCompState *state, UASTNode *node) {
     UVarType type;
     UASTVarNode *var = (UASTVarNode*)node;
     UVar *rawVar = getVarByID(state, var->scope, var->var);
@@ -306,9 +306,9 @@ void compileShort(UCompState *state, UASTNode *node) {
     /* if there's no assignment, the default value will be scary undefined memory :O */
     if (node->left) {
         type = compileExpression(state, node->left);
-        if (type != TYPE_SHORT)
-            cError(state, "Cannot assign type '%s' to %.*s of type 'short'", getTypeName(type), rawVar->len, rawVar->name);
-        setShortVar(state, var->scope, var->var);
+        if (type != TYPE_INT)
+            cError(state, "Cannot assign type '%s' to %.*s of type 'int'", getTypeName(type), rawVar->len, rawVar->name);
+        setIntVar(state, var->scope, var->var);
     }
 }
 
@@ -327,7 +327,7 @@ void compileAST(UCompState *state, UASTNode *node) {
     while (node) {
         switch(node->type) {
             case NODE_STATE_PRNT: compilePrintInt(state, node); break;
-            case NODE_STATE_SHORT: compileShort(state, node); break;
+            case NODE_STATE_INT: compileInt(state, node); break;
             case NODE_STATE_EXPR: compileExpression(state, node->left); break;
             case NODE_STATE_SCOPE: compileScope(state, node); break;
             default:

@@ -13,7 +13,7 @@ typedef enum {
     NODE_SUB,
     NODE_MUL,
     NODE_DIV,
-    NODE_SHORTLIT,
+    NODE_INTLIT,
     NODE_VAR,
     NODE_ASSIGN, /* node->left holds Var node, node->right holds expression */
     /* 
@@ -21,15 +21,15 @@ typedef enum {
             node->left holds expression tree, node->right holds the next statement
     */
     NODE_STATE_PRNT,
-    NODE_STATE_SHORT,
+    NODE_STATE_INT,
     NODE_STATE_EXPR,
     /* scopes are different, node->left holds the statement tree for the scope, node->right holds the next statement */
     NODE_STATE_SCOPE,
 } UASTNodeType;
 
 typedef enum {
-    TYPE_BYTE,
-    TYPE_SHORT,
+    TYPE_CHAR,
+    TYPE_INT,
     TYPE_NONE
 } UVarType;
 

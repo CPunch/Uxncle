@@ -3,8 +3,8 @@
 
 typedef enum {
     /* keywords */
-    TOKEN_BYTE,
-    TOKEN_SHORT,
+    TOKEN_CHAR,
+    TOKEN_INT,
     TOKEN_VOID,
     TOKEN_PRINTINT,
 

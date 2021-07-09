@@ -3,8 +3,8 @@
 
 int main() {
     UASTNode *tree = UP_parseSource(
-        "short a;\n"
-        "short b;" 
+        "int a;\n"
+        "int b;" 
         "a = 8;\n"
         "b = 64 / a / 2;"
         "prntint a;"

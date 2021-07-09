@@ -64,7 +64,7 @@ UASTNode *newNode(UParseState *state, UASTNodeType type, UASTNode *left, UASTNod
 }
 
 UASTNode *newNumNode(UParseState *state, UASTNode *left, UASTNode *right, int num) {
-    UASTIntNode *node = (UASTIntNode*)newBaseNode(state, sizeof(UASTIntNode), NODE_SHORTLIT, left, right);
+    UASTIntNode *node = (UASTIntNode*)newBaseNode(state, sizeof(UASTIntNode), NODE_INTLIT, left, right);
     node->num = num;
     return (UASTNode*)node;
 }
@@ -212,8 +212,8 @@ UASTNode* identifer(UParseState *state, UASTNode *left, Precedence currPrec) {
 
 ParseRule ruleTable[] = {
     /* keywords */
-    {NULL, NULL, PREC_NONE}, /* TOKEN_BYTE */
-    {NULL, NULL, PREC_NONE}, /* TOKEN_SHORT */
+    {NULL, NULL, PREC_NONE}, /* TOKEN_CHAR */
+    {NULL, NULL, PREC_NONE}, /* TOKEN_INT */
     {NULL, NULL, PREC_NONE}, /* TOKEN_VOID */
     {NULL, NULL, PREC_NONE}, /* TOKEN_PRINTINT */
 
@@ -290,7 +290,7 @@ UASTNode* printStatement(UParseState *state) {
     return newNode(state, NODE_STATE_PRNT, expression(state), NULL);
 }
 
-UASTNode* shortStatement(UParseState *state) {
+UASTNode* intStatement(UParseState *state) {
     UASTVarNode *node;
     int var;
 
@@ -299,10 +299,10 @@ UASTNode* shortStatement(UParseState *state) {
         error(state, "Expected identifer!");
 
     /* define the variable */
-    var = newVar(state, TYPE_SHORT, state->previous.str, state->previous.len);
+    var = newVar(state, TYPE_INT, state->previous.str, state->previous.len);
 
     /* if it's assigned a value, evaluate the expression & set the left node, if not set it to NULL */
-    node = (UASTVarNode*)newBaseNode(state, sizeof(UASTVarNode), NODE_STATE_SHORT, (match(state, TOKEN_EQUAL)) ? expression(state) : NULL, NULL);
+    node = (UASTVarNode*)newBaseNode(state, sizeof(UASTVarNode), NODE_STATE_INT, (match(state, TOKEN_EQUAL)) ? expression(state) : NULL, NULL);
     node->var = var;
     node->scope = state->sCount-1;
     return (UASTNode*)node;
@@ -336,8 +336,8 @@ UASTNode* statement(UParseState *state) {
     /* find a statement match */
     if (match(state, TOKEN_PRINTINT)) {
         node = printStatement(state);
-    } else if (match(state, TOKEN_SHORT)) {
-        node = shortStatement(state);
+    } else if (match(state, TOKEN_INT)) {
+        node = intStatement(state);
     } else if (match(state, TOKEN_LEFT_BRACE)) {
         node = scopeStatement(state);
     } else {
@@ -359,10 +359,10 @@ void printNode(UASTNode *node) {
         case NODE_MUL: printf("MUL"); break;
         case NODE_DIV: printf("DIV"); break;
         case NODE_ASSIGN: printf("ASSIGN"); break;
-        case NODE_SHORTLIT: printf("[%d]", ((UASTIntNode*)node)->num); break;
+        case NODE_INTLIT: printf("[%d]", ((UASTIntNode*)node)->num); break;
         case NODE_STATE_PRNT: printf("PRNT"); break;
         case NODE_STATE_SCOPE: printf("SCPE"); break;
-        case NODE_STATE_SHORT: printf("SHRT"); break;
+        case NODE_STATE_INT: printf("INT"); break;
         case NODE_VAR: printf("VAR[%d]", ((UASTVarNode*)node)->var); break;
         case NODE_STATE_EXPR: printf("EXPR"); break;
         default: break;
@@ -382,8 +382,8 @@ void printTree(UASTNode *node, int indent) {
 
 const char* getTypeName(UVarType type) {
     switch(type) {
-        case TYPE_SHORT: return "short";
-        case TYPE_BYTE: return "byte";
+        case TYPE_INT: return "int";
+        case TYPE_CHAR: return "char";
         default:
             return "<errtype>";
     }
