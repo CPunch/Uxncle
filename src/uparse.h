@@ -21,7 +21,8 @@ typedef enum {
             node->left holds expression tree, node->right holds the next statement
     */
     NODE_STATE_PRNT,
-    NODE_STATE_INT,
+    NODE_STATE_DECLARE_VAR,
+    NODE_STATE_DECLARE_FUNC,
     NODE_STATE_EXPR,
     /* scopes are different, node->left holds the statement tree for the scope, node->right holds the next statement */
     NODE_STATE_SCOPE,

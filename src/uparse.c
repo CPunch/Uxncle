@@ -302,7 +302,7 @@ UASTNode* intStatement(UParseState *state) {
     var = newVar(state, TYPE_INT, state->previous.str, state->previous.len);
 
     /* if it's assigned a value, evaluate the expression & set the left node, if not set it to NULL */
-    node = (UASTVarNode*)newBaseNode(state, sizeof(UASTVarNode), NODE_STATE_INT, (match(state, TOKEN_EQUAL)) ? expression(state) : NULL, NULL);
+    node = (UASTVarNode*)newBaseNode(state, sizeof(UASTVarNode), NODE_STATE_DECLARE_VAR, (match(state, TOKEN_EQUAL)) ? expression(state) : NULL, NULL);
     node->var = var;
     node->scope = state->sCount-1;
     return (UASTNode*)node;
@@ -362,7 +362,7 @@ void printNode(UASTNode *node) {
         case NODE_INTLIT: printf("[%d]", ((UASTIntNode*)node)->num); break;
         case NODE_STATE_PRNT: printf("PRNT"); break;
         case NODE_STATE_SCOPE: printf("SCPE"); break;
-        case NODE_STATE_INT: printf("INT"); break;
+        case NODE_STATE_DECLARE_VAR: printf("NVAR"); break;
         case NODE_VAR: printf("VAR[%d]", ((UASTVarNode*)node)->var); break;
         case NODE_STATE_EXPR: printf("EXPR"); break;
         default: break;

@@ -299,7 +299,7 @@ void compilePrintInt(UCompState *state, UASTNode *node) {
     state->pushed -= SIZE_INT;
 }
 
-void compileInt(UCompState *state, UASTNode *node) {
+void compileDeclaration(UCompState *state, UASTNode *node) {
     UVarType type;
     UASTVarNode *var = (UASTVarNode*)node;
     UVar *rawVar = getVarByID(state, var->scope, var->var);
@@ -307,8 +307,8 @@ void compileInt(UCompState *state, UASTNode *node) {
     /* if there's no assignment, the default value will be scary undefined memory :O */
     if (node->left) {
         type = compileExpression(state, node->left);
-        if (type != TYPE_INT)
-            cError(state, "Cannot assign type '%s' to %.*s of type 'int'", getTypeName(type), rawVar->len, rawVar->name);
+        if (compareVarTypes(state, type, rawVar->type))
+            cError(state, "Cannot assign type '%s' to %.*s of type '%s'", getTypeName(type), rawVar->len, rawVar->name, getTypeName(rawVar->type));
         setIntVar(state, var->scope, var->var);
     }
 }
@@ -328,7 +328,7 @@ void compileAST(UCompState *state, UASTNode *node) {
     while (node) {
         switch(node->type) {
             case NODE_STATE_PRNT: compilePrintInt(state, node); break;
-            case NODE_STATE_INT: compileInt(state, node); break;
+            case NODE_STATE_DECLARE_VAR: compileDeclaration(state, node); break;
             case NODE_STATE_EXPR: compileExpression(state, node->left); break;
             case NODE_STATE_SCOPE: compileScope(state, node); break;
             default:
