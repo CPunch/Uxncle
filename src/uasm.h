@@ -13,6 +13,6 @@
 #include <stdio.h>
 
 /* takes a syntax tree and spits out the generated asm into the provided file stream */
-void UA_genTal(UASTNode *tree, FILE *out);
+void UA_genTal(UASTRootNode *tree, FILE *out);
 
 #endif

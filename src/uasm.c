@@ -352,7 +352,7 @@ void compileAST(UCompState *state, UASTNode *node) {
     }
 }
 
-void UA_genTal(UASTNode *tree, FILE *out) {
+void UA_genTal(UASTRootNode *tree, FILE *out) {
     UCompState state;
     state.sCount = 0;
     state.pushed = 0;
@@ -362,7 +362,9 @@ void UA_genTal(UASTNode *tree, FILE *out) {
     fwrite(preamble, sizeof(preamble)-1, 1, out);
 
     /* now parse the whole AST */
-    compileAST(&state, tree);
+    pushScope(&state, &tree->scope);
+    compileAST(&state, tree->_node.left);
+    popScope(&state);
 
     /* finally, write the postamble */
     fwrite(postamble, sizeof(postamble)-1, 1, out);

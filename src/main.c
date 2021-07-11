@@ -2,7 +2,7 @@
 #include "uasm.h"
 
 int main() {
-    UASTNode *tree = UP_parseSource(
+    UASTRootNode *tree = UP_parseSource(
         "int a;\n"
         "int b;" 
         "a = 8;\n"
@@ -13,6 +13,6 @@ int main() {
     UA_genTal(tree, fopen("bin/out.tal", "w"));
 
     /* clean up */
-    UP_freeTree(tree);
+    UP_freeTree((UASTNode*)tree);
     return 0;
 }

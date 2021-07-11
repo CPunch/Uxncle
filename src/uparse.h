@@ -20,6 +20,7 @@ typedef enum {
         statement nodes below
             node->left holds expression tree, node->right holds the next statement
     */
+    NODE_TREEROOT,
     NODE_STATE_PRNT,
     NODE_STATE_DECLARE_VAR,
     NODE_STATE_DECLARE_FUNC,
@@ -57,6 +58,11 @@ typedef struct s_UASTNode {
 
 typedef struct {
     COMMON_NODE_HEADER;
+    UScope scope;
+} UASTRootNode;
+
+typedef struct {
+    COMMON_NODE_HEADER;
     int var; /* index of the UVar */
     int scope; /* index of the scope */
 } UASTVarNode;
@@ -84,7 +90,7 @@ typedef struct {
 const char* getTypeName(UVarType type);
 
 /* returns the base AST node, or NULL if a syntax error occurred */
-UASTNode *UP_parseSource(const char *src);
+UASTRootNode *UP_parseSource(const char *src);
 
 void UP_freeTree(UASTNode *tree);
 

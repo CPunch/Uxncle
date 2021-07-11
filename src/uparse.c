@@ -371,6 +371,7 @@ void printNode(UASTNode *node) {
         case NODE_DIV: printf("DIV"); break;
         case NODE_ASSIGN: printf("ASSIGN"); break;
         case NODE_INTLIT: printf("[%d]", ((UASTIntNode*)node)->num); break;
+        case NODE_TREEROOT: printf("ROOT"); break;
         case NODE_STATE_PRNT: printf("PRNT"); break;
         case NODE_STATE_SCOPE: printf("SCPE"); break;
         case NODE_STATE_DECLARE_VAR: printf("NVAR"); break;
@@ -400,9 +401,9 @@ const char* getTypeName(UVarType type) {
     }
 }
 
-UASTNode *UP_parseSource(const char *src) {
+UASTRootNode *UP_parseSource(const char *src) {
     UParseState state;
-    UASTScopeNode *root = NULL;
+    UASTRootNode *root = NULL;
     UScope *scope;
     int treeIndent = 16;
 
@@ -412,12 +413,12 @@ UASTNode *UP_parseSource(const char *src) {
     scope = newScope(&state);
 
     /* create scope node and copy the finished scope struct */
-    root = (UASTScopeNode*)newBaseNode(&state, state.previous, sizeof(UASTScopeNode), NODE_STATE_SCOPE, parseScope(&state, 0), NULL);
+    root = (UASTRootNode*)newBaseNode(&state, state.previous, sizeof(UASTRootNode), NODE_STATE_SCOPE, parseScope(&state, 0), NULL);
     root->scope = *scope;
 
     endScope(&state);
     printTree((UASTNode*)root, treeIndent);
-    return (UASTNode*)root;
+    return root;
 }
 
 void UP_freeTree(UASTNode *tree) {
