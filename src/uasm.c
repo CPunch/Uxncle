@@ -93,6 +93,15 @@ void cError(UCompState *state, const char *fmt, ...) {
     exit(EXIT_FAILURE);
 }
 
+void cErrorNode(UCompState *state, UASTNode *node, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    printf("Compiler error at '%.*s' on line %d\n\t", node->tkn.len, node->tkn.str, node->tkn.line);
+    vprintf(fmt, args);
+    va_end(args);
+    exit(EXIT_FAILURE);
+}
+
 void writeIntLit(UCompState *state, uint16_t lit) {
     fprintf(state->out, "#%.4x ", lit);
     state->pushed += SIZE_INT;
@@ -252,7 +261,7 @@ UVarType compileAssignment(UCompState *state, UASTNode *node) {
 
     /* make sure we can assign the value of this expression to this variable */
     if (!compareVarTypes(state, expType, rawVar->type))
-        cError(state, "Cannot assign type '%s' to '%.*s' of type '%s'", getTypeName(expType), rawVar->len, rawVar->name, getTypeName(rawVar->type));
+        cErrorNode(state, node, "Cannot assign type '%s' to '%.*s' of type '%s'", getTypeName(expType), rawVar->len, rawVar->name, getTypeName(rawVar->type));
 
     /* duplicate the value on the stack */
     dupValue(state, expType);
@@ -277,7 +286,7 @@ UVarType compileExpression(UCompState *state, UASTNode *node) {
         rType = compileExpression(state, node->right);
 
     if (lType != TYPE_NONE && rType != TYPE_NONE && !compareVarTypes(state, lType, rType))
-        cError(state, "lType '%s' doesn't match rType '%s'!", getTypeName(lType), getTypeName(rType));
+        cErrorNode(state, node, "lType '%s' doesn't match rType '%s'!", getTypeName(lType), getTypeName(rType));
 
     switch(node->type) {
         case NODE_ADD: doArith(state, "ADD", lType); break;
@@ -308,7 +317,7 @@ void compileDeclaration(UCompState *state, UASTNode *node) {
     if (node->left) {
         type = compileExpression(state, node->left);
         if (compareVarTypes(state, type, rawVar->type))
-            cError(state, "Cannot assign type '%s' to %.*s of type '%s'", getTypeName(type), rawVar->len, rawVar->name, getTypeName(rawVar->type));
+            cErrorNode(state, node, "Cannot assign type '%s' to %.*s of type '%s'", getTypeName(type), rawVar->len, rawVar->name, getTypeName(rawVar->type));
         setIntVar(state, var->scope, var->var);
     }
 }

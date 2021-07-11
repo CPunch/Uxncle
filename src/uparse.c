@@ -50,27 +50,28 @@ void error(UParseState *state, const char *fmt, ...) {
     va_end(args);
 }
 
-UASTNode *newBaseNode(UParseState *state, size_t size, UASTNodeType type, UASTNode *left, UASTNode *right) {
+UASTNode *newBaseNode(UParseState *state, UToken tkn, size_t size, UASTNodeType type, UASTNode *left, UASTNode *right) {
     UASTNode *node = UM_realloc(NULL, size);
     node->type = type;
     node->left = left;
     node->right = right;
+    node->tkn = tkn;
 
     return node;
 }
 
-UASTNode *newNode(UParseState *state, UASTNodeType type, UASTNode *left, UASTNode *right) {
-    return newBaseNode(state, sizeof(UASTNode), type, left, right);
+UASTNode *newNode(UParseState *state, UToken tkn, UASTNodeType type, UASTNode *left, UASTNode *right) {
+    return newBaseNode(state, tkn, sizeof(UASTNode), type, left, right);
 }
 
-UASTNode *newNumNode(UParseState *state, UASTNode *left, UASTNode *right, int num) {
-    UASTIntNode *node = (UASTIntNode*)newBaseNode(state, sizeof(UASTIntNode), NODE_INTLIT, left, right);
+UASTNode *newNumNode(UParseState *state, UToken tkn, UASTNode *left, UASTNode *right, int num) {
+    UASTIntNode *node = (UASTIntNode*)newBaseNode(state, tkn,  sizeof(UASTIntNode), NODE_INTLIT, left, right);
     node->num = num;
     return (UASTNode*)node;
 }
 
-UASTNode *newScopeNode(UParseState *state, UASTNode *left, UASTNode *right, UScope *scope) {
-    UASTScopeNode *node = (UASTScopeNode*)newBaseNode(state, sizeof(UASTScopeNode), NODE_STATE_SCOPE, left, right);
+UASTNode *newScopeNode(UParseState *state, UToken tkn, UASTNode *left, UASTNode *right, UScope *scope) {
+    UASTScopeNode *node = (UASTScopeNode*)newBaseNode(state, tkn, sizeof(UASTScopeNode), NODE_STATE_SCOPE, left, right);
     node->scope = *scope;
     return (UASTNode*)node;
 }
@@ -135,8 +136,11 @@ void advance(UParseState *state) {
 
     printf("consumed '%.*s', with type %d\n", state->current.len, state->current.str, state->current.type);
 
-    if (state->current.type == TOKEN_ERR)
-        error(state, "unrecognized symbol '%.*s'!", state->current.len, state->current.str);
+    switch(state->current.type) {
+        case TOKEN_UNREC: error(state, "Unrecognized symbol '%.*s'!", state->current.len, state->current.str); break;
+        case TOKEN_ERR: error(state, "%.*s", state->current.len, state->current.str); break;
+        default: break;
+    }
 }
 
 int check(UParseState *state, UTokenType type) {
@@ -165,19 +169,21 @@ ParseRule* getRule(UTokenType type) {
 UASTNode* number(UParseState *state, UASTNode *left, Precedence currPrec) {
     int num = str2int(state->previous.str, state->previous.len);
     printf("got number %d! from token '%.*s' [%d]\n", num, state->previous.len, state->previous.str, state->previous.type);
-    return newNumNode(state, NULL, NULL, num);
+    return newNumNode(state, state->previous, NULL, NULL, num);
 }
 
 UASTNode* assignment(UParseState *state, UASTNode *left, Precedence currPrec) {
+    UToken tkn = state->previous;
     if (left->type != NODE_VAR)
         error(state, "Expected identifier before '='!");
 
     UASTNode *right = expression(state);
-    return newNode(state, NODE_ASSIGN, left, right);
+    return newNode(state, tkn, NODE_ASSIGN, left, right);
 }
 
 UASTNode* binOperator(UParseState *state, UASTNode *left, Precedence currPrec) {
     UASTNodeType type;
+    UToken tkn = state->previous;
     UASTNode *right;
 
     /* grab the node type */
@@ -193,7 +199,7 @@ UASTNode* binOperator(UParseState *state, UASTNode *left, Precedence currPrec) {
 
     /* grab the right node */
     right = parsePrecedence(state, NULL, currPrec);
-    return newNode(state, type, left, right);
+    return newNode(state, tkn, type, left, right);
 }
 
 UASTNode* identifer(UParseState *state, UASTNode *left, Precedence currPrec) {
@@ -204,7 +210,7 @@ UASTNode* identifer(UParseState *state, UASTNode *left, Precedence currPrec) {
         error(state, "Identifer '%.*s' not found!", state->previous.len, state->previous.str);
 
     /* finally, create the Var node */
-    nVar = (UASTVarNode*)newBaseNode(state, sizeof(UASTVarNode), NODE_VAR, NULL, NULL);
+    nVar = (UASTVarNode*)newBaseNode(state, state->previous, sizeof(UASTVarNode), NODE_VAR, NULL, NULL);
     nVar->var = var->var;
     nVar->scope = var->scope;
     return (UASTNode*)nVar;
@@ -220,6 +226,7 @@ ParseRule ruleTable[] = {
     /* literals */
     {identifer, NULL, PREC_LITERAL}, /* TOKEN_IDENT */
     {number, NULL, PREC_LITERAL}, /* TOKEN_NUMBER */
+    {NULL, NULL, PREC_NONE}, /* TOKEN_CHAR_LIT */
 
     {NULL, NULL, PREC_NONE}, /* TOKEN_LEFT_BRACE */
     {NULL, NULL, PREC_NONE}, /* TOKEN_RIGHT_BRACE */
@@ -236,6 +243,7 @@ ParseRule ruleTable[] = {
     {NULL, binOperator, PREC_FACTOR}, /* TOKEN_STAR */
 
     {NULL, NULL, PREC_NONE}, /* TOKEN_EOF */
+    {NULL, NULL, PREC_NONE}, /* TOKEN_UNREC */
     {NULL, NULL, PREC_NONE}, /* TOKEN_ERR */
 };
 
@@ -286,8 +294,9 @@ UASTNode* parseScope(UParseState *state, int expectBrace) {
 }
 
 UASTNode* printStatement(UParseState *state) {
+    UToken tkn = state->previous;
     /* make our statement node & return */
-    return newNode(state, NODE_STATE_PRNT, expression(state), NULL);
+    return newNode(state, tkn, NODE_STATE_PRNT, expression(state), NULL);
 }
 
 UASTNode* intStatement(UParseState *state) {
@@ -302,7 +311,7 @@ UASTNode* intStatement(UParseState *state) {
     var = newVar(state, TYPE_INT, state->previous.str, state->previous.len);
 
     /* if it's assigned a value, evaluate the expression & set the left node, if not set it to NULL */
-    node = (UASTVarNode*)newBaseNode(state, sizeof(UASTVarNode), NODE_STATE_DECLARE_VAR, (match(state, TOKEN_EQUAL)) ? expression(state) : NULL, NULL);
+    node = (UASTVarNode*)newBaseNode(state, state->previous, sizeof(UASTVarNode), NODE_STATE_DECLARE_VAR, (match(state, TOKEN_EQUAL)) ? expression(state) : NULL, NULL);
     node->var = var;
     node->scope = state->sCount-1;
     return (UASTNode*)node;
@@ -310,10 +319,11 @@ UASTNode* intStatement(UParseState *state) {
 
 UASTNode* scopeStatement(UParseState *state) {
     UASTScopeNode *node;
+    UToken tkn = state->previous;
     UScope *scope = newScope(state);
 
     /* create scope node and copy the finished scope struct */
-    node = (UASTScopeNode*)newBaseNode(state, sizeof(UASTScopeNode), NODE_STATE_SCOPE, parseScope(state, 1), NULL);
+    node = (UASTScopeNode*)newBaseNode(state, tkn, sizeof(UASTScopeNode), NODE_STATE_SCOPE, parseScope(state, 1), NULL);
     node->scope = *scope;
 
     endScope(state);
@@ -341,9 +351,10 @@ UASTNode* statement(UParseState *state) {
     } else if (match(state, TOKEN_LEFT_BRACE)) {
         node = scopeStatement(state);
     } else {
+        UToken tkn = state->previous;
         /* no statement match was found, just parse the expression */
         node = expression(state);
-        node = newNode(state, NODE_STATE_EXPR, node, NULL);
+        node = newNode(state, tkn, NODE_STATE_EXPR, node, NULL);
     }
 
     if (!match(state, TOKEN_COLON))
@@ -401,7 +412,7 @@ UASTNode *UP_parseSource(const char *src) {
     scope = newScope(&state);
 
     /* create scope node and copy the finished scope struct */
-    root = (UASTScopeNode*)newBaseNode(&state, sizeof(UASTScopeNode), NODE_STATE_SCOPE, parseScope(&state, 0), NULL);
+    root = (UASTScopeNode*)newBaseNode(&state, state.previous, sizeof(UASTScopeNode), NODE_STATE_SCOPE, parseScope(&state, 0), NULL);
     root->scope = *scope;
 
     endScope(&state);

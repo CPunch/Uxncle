@@ -11,6 +11,7 @@ typedef enum {
     /* literals */
     TOKEN_IDENT,
     TOKEN_NUMBER,
+    TOKEN_CHAR_LIT,
 
     TOKEN_LEFT_BRACE,
     TOKEN_RIGHT_BRACE,
@@ -27,6 +28,7 @@ typedef enum {
     TOKEN_STAR,
 
     TOKEN_EOF, /* end of file */
+    TOKEN_UNREC, /* unrecognized symbol */
     TOKEN_ERR /* error type */
 } UTokenType;
 
@@ -34,6 +36,7 @@ typedef struct {
     UTokenType type;
     char *str;
     int len;
+    int line;
 } UToken;
 
 typedef struct {

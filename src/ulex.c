@@ -21,14 +21,25 @@ void UL_initLexState(ULexState *state, const char *src) {
 }
 
 UToken makeToken(ULexState *state, UTokenType type) {
-    UToken token;
-    token.str = state->start;
-    token.len = state->current - state->start;
-    token.type = type;
+    UToken tkn;
+    tkn.str = state->start;
+    tkn.len = state->current - state->start;
+    tkn.line = state->line;
+    tkn.type = type;
 
     /* update the state's last token type */
     state->last = type;
-    return token;
+    return tkn;
+}
+
+UToken makeError(ULexState *state, const char *msg) {
+    UToken tkn;
+    tkn.str = (char*)msg;
+    tkn.len = strlen(msg);
+    tkn.line = state->line;
+    tkn.type = TOKEN_ERR;
+
+    return tkn;
 }
 
 /* ==================================[[ char helper functions ]]================================== */
@@ -73,7 +84,8 @@ int isWhitespace(char c) {
 void skipWhitespace(ULexState *state) {
     /* consume all whitespace */
     while (isWhitespace(peek(state))) {
-        if (peek(state) == '\n') /* if it's a new line, make sure we count it */
+        /* if it's a new line, make sure we count it */
+        if (peek(state) == '\n')
             state->line++;
         next(state);
     }
@@ -107,6 +119,36 @@ UToken readIdentifier(ULexState *state) {
     return makeToken(state, identifierType(state)); /* is it a reserved word? */
 }
 
+int consumeCharacter(ULexState *state) {
+    char c = next(state);
+    if (c == '\\') {
+        switch(next(state)) {
+            case '\\': return '\\';
+            case 'n': return '\n';
+            case 't': return '\t';
+            case 'r': return '\r';
+            default:
+                return -1; /* error result */
+        }
+    }
+
+    return c;
+}
+
+UToken readCharacter(ULexState *state) {
+    if (isEnd(state))
+        return makeError(state, "Expected end to character literal!");
+
+    /* consume character */
+    if (consumeCharacter(state) == -1)
+        return makeError(state, "Unknown special character!");
+
+    if (next(state) != '\'')
+        return makeError(state, "Expected end to character literal!");
+
+    return makeToken(state, TOKEN_CHAR_LIT);
+}
+
 UToken UL_scanNext(ULexState *state) {
     char c;
 
@@ -133,6 +175,7 @@ UToken UL_scanNext(ULexState *state) {
         case '/': return makeToken(state, TOKEN_SLASH);
         case '*': return makeToken(state, TOKEN_STAR);
         case ';': return makeToken(state, TOKEN_COLON);
+        case '\'': return readCharacter(state);
         case '\0': return makeToken(state, TOKEN_EOF);
         default:
             if (isNumeric(c))
@@ -143,6 +186,6 @@ UToken UL_scanNext(ULexState *state) {
                 return readIdentifier(state);
     }
 
-    /* it's none of those, so it's an unrecognized token. return an error result for now */
-    return makeToken(state, TOKEN_ERR);
+    /* it's none of those, so it's an unrecognized token */
+    return makeToken(state, TOKEN_UNREC);
 }

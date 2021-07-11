@@ -50,6 +50,7 @@ typedef struct {
 
 typedef struct s_UASTNode {
     UASTNodeType type;
+    UToken tkn;
     struct s_UASTNode *left;
     struct s_UASTNode *right;
 } UASTNode;
