@@ -67,6 +67,15 @@ char peekNext(ULexState *state) {
     return state->current[1];
 }
 
+int charMatch(ULexState *state, char expected) {
+    if (isEnd(state) || *state->current != expected)
+        return 0;
+
+    /* it charMatched, so increment the currentChar and return true */
+    state->current++;
+    return 1;
+}
+
 int isAlpha(char c) {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'; /* identifiers can have '_' */
 }
@@ -169,12 +178,13 @@ UToken UL_scanNext(ULexState *state) {
         case '}': return makeToken(state, TOKEN_RIGHT_BRACE);
         case '[': return makeToken(state, TOKEN_LEFT_BRACKET);
         case ']': return makeToken(state, TOKEN_RIGHT_BRACKET);
-        case '=': return makeToken(state, TOKEN_EQUAL);
         case '+': return makeToken(state, TOKEN_PLUS);
         case '-': return makeToken(state, TOKEN_MINUS);
         case '/': return makeToken(state, TOKEN_SLASH);
         case '*': return makeToken(state, TOKEN_STAR);
         case ';': return makeToken(state, TOKEN_COLON);
+        case '=': return charMatch(state, '=') ? makeToken(state, TOKEN_EQUAL_EQUAL) : makeToken(state, TOKEN_EQUAL);
+        case '!': return charMatch(state, '=') ? makeToken(state, TOKEN_BANG_EQUAL) : makeToken(state, TOKEN_BANG);
         case '\'': return readCharacter(state);
         case '\0': return makeToken(state, TOKEN_EOF);
         default:

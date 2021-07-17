@@ -4,6 +4,7 @@
 typedef enum {
     PREC_NONE,
     PREC_ASSIGNMENT,    /* = */
+    PREC_COMPAR,        /* == != */
     PREC_TERM,          /* + - */
     PREC_FACTOR,        /* * / */
     PREC_LITERAL,       /* literal values */
@@ -192,6 +193,8 @@ UASTNode* binOperator(UParseState *state, UASTNode *left, Precedence currPrec) {
         case TOKEN_MINUS: type = NODE_SUB; break;
         case TOKEN_STAR: type = NODE_MUL; break;
         case TOKEN_SLASH: type = NODE_DIV; break;
+        case TOKEN_EQUAL_EQUAL: type = NODE_EQUAL; break;
+        case TOKEN_BANG_EQUAL: type = NODE_NOTEQUAL; break;
         default:
             error(state, "Unknown binary operator '%.*s'!", state->current.len, state->current.str);
             return NULL;
@@ -241,7 +244,10 @@ ParseRule ruleTable[] = {
     {NULL, binOperator, PREC_TERM}, /* TOKEN_MINUS */
     {NULL, binOperator, PREC_FACTOR}, /* TOKEN_SLASH */
     {NULL, binOperator, PREC_FACTOR}, /* TOKEN_STAR */
+    {NULL, NULL, PREC_NONE}, /* TOKEN_BANG */
 
+    {NULL, binOperator, PREC_COMPAR}, /* TOKEN_EQUAL_EQUAL */
+    {NULL, binOperator, PREC_COMPAR}, /* TOKEN_BANG_EQUAL */
     {NULL, NULL, PREC_NONE}, /* TOKEN_EOF */
     {NULL, NULL, PREC_NONE}, /* TOKEN_UNREC */
     {NULL, NULL, PREC_NONE}, /* TOKEN_ERR */

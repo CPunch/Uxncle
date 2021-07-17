@@ -211,6 +211,30 @@ int compareVarTypes(UCompState *state, UVarType t1, UVarType t2) {
     return t1 == t2;
 }
 
+/* assumes `from` is already on the stack */
+int tryTypeCast(UCompState *state, UVarType from, UVarType to) {
+    if (compareVarTypes(state, from, to))
+        return 1;
+
+    switch(to) {
+        case TYPE_INT:
+            switch(from) {
+                case TYPE_CHAR: fprintf(state->out, "SWP POP\n"); state->pushed -= 1; break; /* moves the most significant byte to the front and pops it */
+                default: return 0;
+            }
+            break;
+        case TYPE_CHAR:
+            switch(from) {
+                case TYPE_INT: fprintf(state->out, "#00 SWP\n"); state->pushed += 1; break; /* pushes an empty byte to the stack and moves it to the most significant byte */
+                default: return 0;
+            }
+            break;
+        default: return 0;
+    }
+
+    return 1;
+}
+
 /* ==================================[[ arithmetic ]]================================== */
 
 void pop(UCompState *state, int size) {
@@ -251,6 +275,22 @@ void doArith(UCompState *state, const char *instr, UVarType type) {
     }
 }
 
+void doComp(UCompState *state, const char *instr, UVarType type) {
+    switch(type) {
+        case TYPE_INT:
+            fprintf(state->out, "%s2\n", instr);
+            state->pushed -= SIZE_INT*2; /* pop the two shorts */
+            break;
+        case TYPE_CHAR:
+            fprintf(state->out, "%s\n", instr);
+            state->pushed -= SIZE_CHAR*2; /* pop the two chars */
+            break;
+        default:
+            cError(state, "Unknown variable type! [%d]", type);
+    }
+    state->pushed += SIZE_CHAR;
+}
+
 UVarType compileAssignment(UCompState *state, UASTNode *node) {
     UASTVarNode *nVar = (UASTVarNode*)node->left;
     UVar *rawVar = getVarByID(state, nVar->scope, nVar->var);
@@ -260,7 +300,7 @@ UVarType compileAssignment(UCompState *state, UASTNode *node) {
     expType = compileExpression(state, node->right);
 
     /* make sure we can assign the value of this expression to this variable */
-    if (!compareVarTypes(state, expType, rawVar->type))
+    if (!tryTypeCast(state, expType, rawVar->type))
         cErrorNode(state, node, "Cannot assign type '%s' to '%.*s' of type '%s'", getTypeName(expType), rawVar->len, rawVar->name, getTypeName(rawVar->type));
 
     /* duplicate the value on the stack */
@@ -269,7 +309,7 @@ UVarType compileAssignment(UCompState *state, UASTNode *node) {
     /* assign the copy to the variable, leaving a copy on the stack for the expression */
     setVar(state, nVar->scope, nVar->var, expType);
 
-    return expType;
+    return rawVar->type;
 }
 
 UVarType compileExpression(UCompState *state, UASTNode *node) {
@@ -293,7 +333,9 @@ UVarType compileExpression(UCompState *state, UASTNode *node) {
         case NODE_SUB: doArith(state, "SUB", lType); break;
         case NODE_MUL: doArith(state, "MUL", lType); break;
         case NODE_DIV: doArith(state, "DIV", lType); break;
-        case NODE_INTLIT: writeIntLit(state, ((UASTIntNode*)node)->num); return TYPE_INT; break;
+        case NODE_EQUAL: doComp(state, "EQU", lType); return TYPE_CHAR;
+        case NODE_NOTEQUAL: doComp(state, "NEQ", lType); return TYPE_CHAR;
+        case NODE_INTLIT: writeIntLit(state, ((UASTIntNode*)node)->num); return TYPE_INT;
         case NODE_VAR: return compileVar(state, node); break;
         default:
             cError(state, "unknown AST node!! [%d]\n", node->type);

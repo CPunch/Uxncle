@@ -26,6 +26,11 @@ typedef enum {
     TOKEN_MINUS,
     TOKEN_SLASH,
     TOKEN_STAR,
+    TOKEN_BANG,
+
+    /* two character tokens */
+    TOKEN_EQUAL_EQUAL,
+    TOKEN_BANG_EQUAL,
 
     TOKEN_EOF, /* end of file */
     TOKEN_UNREC, /* unrecognized symbol */

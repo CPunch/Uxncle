@@ -9,10 +9,14 @@
 #define COMMON_NODE_HEADER UASTNode _node;
 
 typedef enum {
+    /* arith op */
     NODE_ADD,
     NODE_SUB,
     NODE_MUL,
     NODE_DIV,
+    NODE_EQUAL,
+    NODE_NOTEQUAL,
+    /* literals */
     NODE_INTLIT,
     NODE_VAR,
     NODE_ASSIGN, /* node->left holds Var node, node->right holds expression */
