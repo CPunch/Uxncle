@@ -84,6 +84,10 @@ int isNumeric(char c) {
     return c >= '0' && c <= '9';
 }
 
+int isHex(char c) {
+    return isNumeric(c) || ((c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f'));
+}
+
 int isWhitespace(char c) {
     return c == ' ' || c == '\n' || c == '\r' || c == '\t';
 }
@@ -115,6 +119,19 @@ UTokenType identifierType(ULexState *state) {
 }
 
 UToken readNumber(ULexState *state) {
+    switch(peek(state)) {
+        case 'x': /* hexadecimal number */
+            next(state);
+
+            /* consume hexadecimal */
+            while(isHex(peek(state)))
+                next(state);
+            
+            return makeToken(state, TOKEN_HEX);
+        /* TODO: add binary encoding, eg. "0b01000101" */
+        default: break;/* its a normal number, fall through and continue parsing */
+    }
+
     while (isNumeric(peek(state)))
         next(state);
 

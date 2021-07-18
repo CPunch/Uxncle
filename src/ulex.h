@@ -11,6 +11,7 @@ typedef enum {
     /* literals */
     TOKEN_IDENT,
     TOKEN_NUMBER,
+    TOKEN_HEX,
     TOKEN_CHAR_LIT,
 
     TOKEN_LEFT_BRACE,

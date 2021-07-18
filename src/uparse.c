@@ -24,17 +24,6 @@ UASTNode* expression(UParseState *state);
 UASTNode* statement(UParseState *state);
 ParseRule ruleTable[];
 
-int str2int(char *str, int len) {
-    int i;
-    int ret = 0;
-
-    for(i = 0; i < len; ++i) {
-        ret = ret * 10 + (str[i] - '0');
-    }
-
-    return ret;
-}
-
 /* ==================================[[ generic helper functions ]]================================== */
 
 void errorAt(UToken *token, int line, const char *fmt, va_list args) {
@@ -168,7 +157,13 @@ ParseRule* getRule(UTokenType type) {
 /* ==================================[[ parse functions ]]================================== */
 
 UASTNode* number(UParseState *state, UASTNode *left, Precedence currPrec) {
-    int num = str2int(state->previous.str, state->previous.len);
+    int num = strtol(state->previous.str, NULL, 10);
+    printf("got number %d! from token '%.*s' [%d]\n", num, state->previous.len, state->previous.str, state->previous.type);
+    return newNumNode(state, state->previous, NULL, NULL, num);
+}
+
+UASTNode* hexnum(UParseState *state, UASTNode *left, Precedence currPrec) {
+    int num = strtol(state->previous.str + 2, NULL, 16); /* +2 to skip 0x */
     printf("got number %d! from token '%.*s' [%d]\n", num, state->previous.len, state->previous.str, state->previous.type);
     return newNumNode(state, state->previous, NULL, NULL, num);
 }
@@ -229,6 +224,7 @@ ParseRule ruleTable[] = {
     /* literals */
     {identifer, NULL, PREC_LITERAL}, /* TOKEN_IDENT */
     {number, NULL, PREC_LITERAL}, /* TOKEN_NUMBER */
+    {hexnum, NULL, PREC_LITERAL}, /* TOKEN_HEX */
     {NULL, NULL, PREC_NONE}, /* TOKEN_CHAR_LIT */
 
     {NULL, NULL, PREC_NONE}, /* TOKEN_LEFT_BRACE */
