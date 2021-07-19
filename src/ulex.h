@@ -6,7 +6,10 @@ typedef enum {
     TOKEN_CHAR,
     TOKEN_INT,
     TOKEN_VOID,
+    TOKEN_BOOL,
     TOKEN_PRINTINT,
+    TOKEN_IF,
+    TOKEN_ELSE,
 
     /* literals */
     TOKEN_IDENT,

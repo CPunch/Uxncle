@@ -29,12 +29,14 @@ typedef enum {
     NODE_STATE_DECLARE_VAR,
     NODE_STATE_DECLARE_FUNC,
     NODE_STATE_EXPR,
+    NODE_STATE_IF,
     /* scopes are different, node->left holds the statement tree for the scope, node->right holds the next statement */
     NODE_STATE_SCOPE,
 } UASTNodeType;
 
 typedef enum {
     TYPE_CHAR,
+    TYPE_BOOL,
     TYPE_INT,
     TYPE_NONE
 } UVarType;
@@ -80,6 +82,12 @@ typedef struct {
     COMMON_NODE_HEADER;
     UScope scope;
 } UASTScopeNode;
+
+typedef struct {
+    COMMON_NODE_HEADER;
+    UASTNode *block;
+    UASTNode *elseBlock;
+} UASTIfNode;
 
 typedef struct {
     /* lexer related info */

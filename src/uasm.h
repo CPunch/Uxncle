@@ -9,6 +9,7 @@
 
 #define SIZE_INT    2
 #define SIZE_CHAR   1
+#define SIZE_BOOL   1
 
 #include <stdio.h>
 

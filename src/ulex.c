@@ -11,7 +11,10 @@ UReservedWord reservedWords[] = {
     {TOKEN_CHAR, "char", 4},
     {TOKEN_INT, "int", 3},
     {TOKEN_VOID, "void", 4},
-    {TOKEN_PRINTINT, "prntint", 7}
+    {TOKEN_BOOL, "bool", 4},
+    {TOKEN_PRINTINT, "prntint", 7},
+    {TOKEN_IF, "if", 2},
+    {TOKEN_ELSE, "else", 4},
 };
 
 void UL_initLexState(ULexState *state, const char *src) {

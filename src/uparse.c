@@ -26,8 +26,8 @@ ParseRule ruleTable[];
 
 /* ==================================[[ generic helper functions ]]================================== */
 
-void errorAt(UToken *token, int line, const char *fmt, va_list args) {
-    printf("Syntax error at '%.*s' on line %d\n\t", token->len, token->str, line);
+void errorAt(UToken *token, const char *fmt, va_list args) {
+    printf("Syntax error at '%.*s' on line %d\n\t", token->len, token->str, token->line);
     vprintf(fmt, args);
     printf("\n");
     exit(EXIT_FAILURE);
@@ -36,7 +36,7 @@ void errorAt(UToken *token, int line, const char *fmt, va_list args) {
 void error(UParseState *state, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    errorAt(&state->previous, state->lstate.line, fmt, args);
+    errorAt(&state->previous, fmt, args);
     va_end(args);
 }
 
@@ -219,7 +219,10 @@ ParseRule ruleTable[] = {
     {NULL, NULL, PREC_NONE}, /* TOKEN_CHAR */
     {NULL, NULL, PREC_NONE}, /* TOKEN_INT */
     {NULL, NULL, PREC_NONE}, /* TOKEN_VOID */
+    {NULL, NULL, PREC_NONE}, /* TOKEN_BOOL */
     {NULL, NULL, PREC_NONE}, /* TOKEN_PRINTINT */
+    {NULL, NULL, PREC_NONE}, /* TOKEN_IF */
+    {NULL, NULL, PREC_NONE}, /* TOKEN_ELSE */
 
     /* literals */
     {identifer, NULL, PREC_LITERAL}, /* TOKEN_IDENT */
@@ -301,7 +304,7 @@ UASTNode* printStatement(UParseState *state) {
     return newNode(state, tkn, NODE_STATE_PRNT, expression(state), NULL);
 }
 
-UASTNode* intStatement(UParseState *state) {
+UASTNode* varTypeStatement(UParseState *state, UVarType type) {
     UASTVarNode *node;
     int var;
 
@@ -310,7 +313,7 @@ UASTNode* intStatement(UParseState *state) {
         error(state, "Expected identifer!");
 
     /* define the variable */
-    var = newVar(state, TYPE_INT, state->previous.str, state->previous.len);
+    var = newVar(state, type, state->previous.str, state->previous.len);
 
     /* if it's assigned a value, evaluate the expression & set the left node, if not set it to NULL */
     node = (UASTVarNode*)newBaseNode(state, state->previous, sizeof(UASTVarNode), NODE_STATE_DECLARE_VAR, (match(state, TOKEN_EQUAL)) ? expression(state) : NULL, NULL);
@@ -333,6 +336,26 @@ UASTNode* scopeStatement(UParseState *state) {
     return (UASTNode*)node;
 }
 
+UASTNode* ifStatement(UParseState *state) {
+    UASTIfNode *node = (UASTIfNode*)newBaseNode(state, state->previous, sizeof(UASTIfNode), NODE_STATE_IF, NULL, NULL);
+
+    if (!match(state, TOKEN_LEFT_PAREN))
+        error(state, "Expected '(' to start if conditional!");
+
+    /* set the expression */
+    node->_node.left = expression(state);
+
+    if (!match(state, TOKEN_RIGHT_PAREN))
+        error(state, "Expected ')' to end if conditional!");
+
+    /* parse the true block */
+    node->block = statement(state);
+
+    /* if there's an else block, parse it too */
+    node->elseBlock = match(state, TOKEN_ELSE) ? statement(state) : NULL;
+    return (UASTNode*)node;
+}
+
 UASTNode* expression(UParseState *state) {
     UASTNode *node = parsePrecedence(state, NULL, PREC_ASSIGNMENT);
 
@@ -349,9 +372,14 @@ UASTNode* statement(UParseState *state) {
     if (match(state, TOKEN_PRINTINT)) {
         node = printStatement(state);
     } else if (match(state, TOKEN_INT)) {
-        node = intStatement(state);
+        node = varTypeStatement(state, TYPE_INT);
+    } else if (match(state, TOKEN_BOOL)) {
+        node = varTypeStatement(state, TYPE_BOOL);
+    /* the statements below don't require a colon, they directly return skipping that check */
     } else if (match(state, TOKEN_LEFT_BRACE)) {
-        node = scopeStatement(state);
+        return scopeStatement(state);
+    } else if (match(state, TOKEN_IF)) {
+        return ifStatement(state);
     } else {
         UToken tkn = state->previous;
         /* no statement match was found, just parse the expression */
@@ -377,6 +405,7 @@ void printNode(UASTNode *node) {
         case NODE_STATE_PRNT: printf("PRNT"); break;
         case NODE_STATE_SCOPE: printf("SCPE"); break;
         case NODE_STATE_DECLARE_VAR: printf("NVAR"); break;
+        case NODE_STATE_IF: printf("IF"); break;
         case NODE_VAR: printf("VAR[%d]", ((UASTVarNode*)node)->var); break;
         case NODE_STATE_EXPR: printf("EXPR"); break;
         default: break;
@@ -398,6 +427,7 @@ const char* getTypeName(UVarType type) {
     switch(type) {
         case TYPE_INT: return "int";
         case TYPE_CHAR: return "char";
+        case TYPE_BOOL: return "bool";
         default:
             return "<errtype>";
     }

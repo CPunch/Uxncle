@@ -7,6 +7,7 @@ typedef struct {
     UScope *scopes[MAX_SCOPES];
     int sCount;
     int pushed; /* current bytes on the stack */
+    int jmpID;
 } UCompState;
 
 static const char preamble[] =
@@ -114,7 +115,7 @@ void writeByteLit(UCompState *state, uint8_t lit) {
 
 uint16_t getSize(UCompState *state, UVar *var) {
     switch(var->type) {
-        case TYPE_CHAR: return 1;
+        case TYPE_CHAR: case TYPE_BOOL: return 1;
         case TYPE_INT: return 2;
         default:
             cError(state, "unknown type! [%d]", var->type);
@@ -217,15 +218,24 @@ int tryTypeCast(UCompState *state, UVarType from, UVarType to) {
         return 1;
 
     switch(to) {
-        case TYPE_INT:
+        case TYPE_CHAR:
             switch(from) {
-                case TYPE_CHAR: fprintf(state->out, "SWP POP\n"); state->pushed -= 1; break; /* moves the most significant byte to the front and pops it */
+                case TYPE_INT: fprintf(state->out, "SWP POP\n"); state->pushed -= 1; break; /* moves the most significant byte to the front and pops it */
+                case TYPE_BOOL: break; /* TYPE_BOOL is already the same size */
                 default: return 0;
             }
             break;
-        case TYPE_CHAR:
+        case TYPE_INT:
             switch(from) {
-                case TYPE_INT: fprintf(state->out, "#00 SWP\n"); state->pushed += 1; break; /* pushes an empty byte to the stack and moves it to the most significant byte */
+                /* the process to convert TYPE_CHAR & TYPE_BOOL to TYPE_INT is the same */
+                case TYPE_BOOL: case TYPE_CHAR: fprintf(state->out, "#00 SWP\n"); state->pushed += 1; break; /* pushes an empty byte to the stack and moves it to the most significant byte */
+                default: return 0;
+            }
+            break;
+        case TYPE_BOOL: /* do a comparison if the value is not equal to zero */
+            switch(from) {
+                case TYPE_INT: fprintf(state->out, "#0000 NEQ2\n"); state->pushed -= 1; break;
+                case TYPE_CHAR: fprintf(state->out, "#00 NEQ\n"); break;
                 default: return 0;
             }
             break;
@@ -255,7 +265,7 @@ void pop(UCompState *state, int size) {
 void dupValue(UCompState *state, UVarType type) {
     switch(type) {
         case TYPE_INT: fprintf(state->out, "DUP2\n"); state->pushed+=SIZE_INT; break;
-        case TYPE_CHAR: fprintf(state->out, "DUP\n"); state->pushed+=SIZE_CHAR; break;
+        case TYPE_CHAR: case TYPE_BOOL: fprintf(state->out, "DUP\n"); state->pushed+=SIZE_CHAR; break;
         default:
             cError(state, "Unknown variable type! [%d]", type);
     }
@@ -281,14 +291,15 @@ void doComp(UCompState *state, const char *instr, UVarType type) {
             fprintf(state->out, "%s2\n", instr);
             state->pushed -= SIZE_INT*2; /* pop the two shorts */
             break;
-        case TYPE_CHAR:
+        case TYPE_CHAR: /* char and bool are the same size */
+        case TYPE_BOOL:
             fprintf(state->out, "%s\n", instr);
-            state->pushed -= SIZE_CHAR*2; /* pop the two chars */
+            state->pushed -= SIZE_CHAR*2; /* pop the two bytes */
             break;
         default:
             cError(state, "Unknown variable type! [%d]", type);
     }
-    state->pushed += SIZE_CHAR;
+    state->pushed += SIZE_BOOL;
 }
 
 UVarType compileAssignment(UCompState *state, UASTNode *node) {
@@ -333,8 +344,8 @@ UVarType compileExpression(UCompState *state, UASTNode *node) {
         case NODE_SUB: doArith(state, "SUB", lType); break;
         case NODE_MUL: doArith(state, "MUL", lType); break;
         case NODE_DIV: doArith(state, "DIV", lType); break;
-        case NODE_EQUAL: doComp(state, "EQU", lType); return TYPE_CHAR;
-        case NODE_NOTEQUAL: doComp(state, "NEQ", lType); return TYPE_CHAR;
+        case NODE_EQUAL: doComp(state, "EQU", lType); return TYPE_BOOL;
+        case NODE_NOTEQUAL: doComp(state, "NEQ", lType); return TYPE_BOOL;
         case NODE_INTLIT: writeIntLit(state, ((UASTIntNode*)node)->num); return TYPE_INT;
         case NODE_VAR: return compileVar(state, node); break;
         default:
@@ -358,7 +369,7 @@ void compileDeclaration(UCompState *state, UASTNode *node) {
     /* if there's no assignment, the default value will be scary undefined memory :O */
     if (node->left) {
         type = compileExpression(state, node->left);
-        if (compareVarTypes(state, type, rawVar->type))
+        if (!compareVarTypes(state, type, rawVar->type))
             cErrorNode(state, node, "Cannot assign type '%s' to %.*s of type '%s'", getTypeName(type), rawVar->len, rawVar->name, getTypeName(rawVar->type));
         setIntVar(state, var->scope, var->var);
     }
@@ -374,20 +385,48 @@ void compileScope(UCompState *state, UASTNode *node) {
     popScope(state);
 }
 
+void compileIf(UCompState *state, UASTNode *node) {
+    UASTIfNode *ifNode = (UASTIfNode*)node;
+    int jmpID = state->jmpID++;
+
+    /* compile conditional */
+    UVarType type = compileExpression(state, node->left);
+
+    if (!tryTypeCast(state, type, TYPE_BOOL))
+        cErrorNode(state, (UASTNode*)ifNode, "Cannot cast type '%s' to type '%s'", getTypeName(type), getTypeName(TYPE_BOOL));
+
+    /* write comparison jump, if the flag is not equal to true, skip the true statements */
+    fprintf(state->out, "#01 NEQ ;jmp%d JCN2\n", jmpID);
+    state->pushed -= SIZE_BOOL;
+
+    compileAST(state, ifNode->block);
+
+    if (ifNode->elseBlock) {
+        int tmpJmp = jmpID;
+        fprintf(state->out, ";jmp%d JMP2\n", jmpID = state->jmpID++);
+        fprintf(state->out, "@jmp%d\n", tmpJmp);
+        compileAST(state, ifNode->elseBlock);
+    }
+
+    fprintf(state->out, "@jmp%d\n", jmpID);
+}
+
 void compileAST(UCompState *state, UASTNode *node) {
     /* STATE nodes hold the expression in node->left, and the next expression in node->right */
     while (node) {
+        int startPushed = state->pushed;
         switch(node->type) {
             case NODE_STATE_PRNT: compilePrintInt(state, node); break;
             case NODE_STATE_DECLARE_VAR: compileDeclaration(state, node); break;
             case NODE_STATE_EXPR: compileExpression(state, node->left); break;
             case NODE_STATE_SCOPE: compileScope(state, node); break;
+            case NODE_STATE_IF: compileIf(state, node); break;
             default:
                 cError(state, "unknown statement node!! [%d]\n", node->type);
         }
 
         /* clean the stack */
-        pop(state, state->pushed);
+        pop(state, state->pushed - startPushed);
 
         /* move to the next statement */
         node = node->right;
@@ -398,6 +437,7 @@ void UA_genTal(UASTRootNode *tree, FILE *out) {
     UCompState state;
     state.sCount = 0;
     state.pushed = 0;
+    state.jmpID = 0;
     state.out = out;
 
     /* first, write the preamble */
