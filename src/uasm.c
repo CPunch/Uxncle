@@ -395,17 +395,20 @@ void compileIf(UCompState *state, UASTNode *node) {
     if (!tryTypeCast(state, type, TYPE_BOOL))
         cErrorNode(state, (UASTNode*)ifNode, "Cannot cast type '%s' to type '%s'", getTypeName(type), getTypeName(TYPE_BOOL));
 
-    /* write comparison jump, if the flag is not equal to true, skip the true statements */
-    fprintf(state->out, "#01 NEQ ;jmp%d JCN2\n", jmpID);
     state->pushed -= SIZE_BOOL;
-
-    compileAST(state, ifNode->block);
-
     if (ifNode->elseBlock) {
         int tmpJmp = jmpID;
-        fprintf(state->out, ";jmp%d JMP2\n", jmpID = state->jmpID++);
-        fprintf(state->out, "@jmp%d\n", tmpJmp);
+        /* write comparison jump, if the flag is equal to true, skip the else statements */
+        fprintf(state->out, ";jmp%d JCN2\n", tmpJmp);
         compileAST(state, ifNode->elseBlock);
+        fprintf(state->out, ";jmp%d JMP2\n", jmpID = state->jmpID++);
+        /* true block */
+        fprintf(state->out, "@jmp%d\n", tmpJmp);
+        compileAST(state, ifNode->block);
+    } else {
+        /* write comparison jump, if the flag is not equal to true, skip the true statements */
+        fprintf(state->out, "#01 NEQ ;jmp%d JCN2\n", jmpID);
+        compileAST(state, ifNode->block);
     }
 
     fprintf(state->out, "@jmp%d\n", jmpID);
