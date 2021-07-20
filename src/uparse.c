@@ -223,6 +223,7 @@ ParseRule ruleTable[] = {
     {NULL, NULL, PREC_NONE}, /* TOKEN_PRINTINT */
     {NULL, NULL, PREC_NONE}, /* TOKEN_IF */
     {NULL, NULL, PREC_NONE}, /* TOKEN_ELSE */
+    {NULL, NULL, PREC_NONE}, /* TOKEN_WHILE */
 
     /* literals */
     {identifer, NULL, PREC_LITERAL}, /* TOKEN_IDENT */
@@ -356,6 +357,23 @@ UASTNode* ifStatement(UParseState *state) {
     return (UASTNode*)node;
 }
 
+UASTNode* whileStatement(UParseState *state) {
+    UASTWhileNode *node = (UASTWhileNode*)newBaseNode(state, state->previous, sizeof(UASTWhileNode), NODE_STATE_WHILE, NULL, NULL);
+
+    if (!match(state, TOKEN_LEFT_PAREN))
+        error(state, "Expected '(' to start while conditional!");
+
+    /* set the expression */
+    node->_node.left = expression(state);
+
+    if (!match(state, TOKEN_RIGHT_PAREN))
+        error(state, "Expected ')' to end while conditional!");
+
+    /* parse the true block */
+    node->block = statement(state);
+    return (UASTNode*)node;
+}
+
 UASTNode* expression(UParseState *state) {
     UASTNode *node = parsePrecedence(state, NULL, PREC_ASSIGNMENT);
 
@@ -380,6 +398,8 @@ UASTNode* statement(UParseState *state) {
         return scopeStatement(state);
     } else if (match(state, TOKEN_IF)) {
         return ifStatement(state);
+    } else if (match(state, TOKEN_WHILE)) {
+        return whileStatement(state);
     } else {
         UToken tkn = state->previous;
         /* no statement match was found, just parse the expression */
@@ -406,6 +426,7 @@ void printNode(UASTNode *node) {
         case NODE_STATE_SCOPE: printf("SCPE"); break;
         case NODE_STATE_DECLARE_VAR: printf("NVAR"); break;
         case NODE_STATE_IF: printf("IF"); break;
+        case NODE_STATE_WHILE: printf("WHIL"); break;
         case NODE_VAR: printf("VAR[%d]", ((UASTVarNode*)node)->var); break;
         case NODE_STATE_EXPR: printf("EXPR"); break;
         default: break;
