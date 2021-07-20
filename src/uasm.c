@@ -143,9 +143,13 @@ void pushScope(UCompState *state, UScope *scope) {
 
 void popScope(UCompState *state) {
     UScope *scope = state->scopes[--state->sCount];
-    writeIntLit(state, getScopeSize(state, scope));
-    fwrite(";dealloc-uxncle JSR2\n", 21, 1, state->out);
-    state->pushed -= SIZE_INT;
+    int scopeSize = getScopeSize(state, scope);
+
+    if (scopeSize != 0) {
+        writeIntLit(state, scopeSize);
+        fwrite(";dealloc-uxncle JSR2\n", 21, 1, state->out);
+        state->pushed -= SIZE_INT;
+    }
 }
 
 uint16_t getOffset(UCompState *state, int scope, int var) {
