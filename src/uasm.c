@@ -327,7 +327,7 @@ void doComp(UCompState *state, const char *instr, UVarType type) {
     state->pushed += SIZE_BOOL;
 }
 
-UVarType compileAssignment(UCompState *state, UASTNode *node) {
+UVarType compileAssignment(UCompState *state, UASTNode *node, int expectsVal) {
     UASTVarNode *nVar = (UASTVarNode*)node->left;
     UVar *rawVar = getVarByID(state, nVar->scope, nVar->var);
     UVarType expType;
@@ -339,8 +339,9 @@ UVarType compileAssignment(UCompState *state, UASTNode *node) {
     if (!tryTypeCast(state, expType, rawVar->type))
         cErrorNode(state, node, "Cannot assign type '%s' to '%.*s' of type '%s'", getTypeName(expType), rawVar->len, rawVar->name, getTypeName(rawVar->type));
 
-    /* duplicate the value on the stack */
-    dupValue(state, expType);
+    /* duplicate the value on the stack if it's expected */
+    if (expectsVal)
+        dupValue(state, expType);
 
     /* assign the copy to the variable, leaving a copy on the stack for the expression */
     setVar(state, nVar->scope, nVar->var, expType);
@@ -353,7 +354,7 @@ UVarType compileExpression(UCompState *state, UASTNode *node) {
 
     /* assignments are special, they're like statements but can be inside of expressions */
     if (node->type == NODE_ASSIGN)
-        return compileAssignment(state, node);
+        return compileAssignment(state, node, 1);
 
     /* first, traverse down the AST recusively */
     if (node->left)
@@ -474,7 +475,12 @@ void compileAST(UCompState *state, UASTNode *node) {
         switch(node->type) {
             case NODE_STATE_PRNT: compilePrintInt(state, node); break;
             case NODE_STATE_DECLARE_VAR: compileDeclaration(state, node); break;
-            case NODE_STATE_EXPR: compileExpression(state, node->left); break;
+            case NODE_STATE_EXPR: 
+                if (node->left->type == NODE_ASSIGN)
+                    compileAssignment(state, node->left, 0);
+                else
+                    compileExpression(state, node->left); 
+                break;
             case NODE_STATE_SCOPE: compileScope(state, node); break;
             case NODE_STATE_IF: compileIf(state, node); break;
             case NODE_STATE_WHILE: compileWhile(state, node); break;
