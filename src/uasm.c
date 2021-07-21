@@ -137,16 +137,20 @@ uint16_t getScopeSize(UCompState *state, UScope *scope) {
 
 void pushScope(UCompState *state, UScope *scope) {
     state->scopes[state->sCount++] = scope;
-    writeIntLit(state, getScopeSize(state, scope));
-    fwrite(";alloc-uxncle JSR2\n", 19, 1, state->out);
-    state->pushed -= SIZE_INT;
+    int scopeSize = getScopeSize(state, scope);
+
+    if (scopeSize > 0) {
+        writeIntLit(state, getScopeSize(state, scope));
+        fwrite(";alloc-uxncle JSR2\n", 19, 1, state->out);
+        state->pushed -= SIZE_INT;
+    }
 }
 
 void popScope(UCompState *state) {
     UScope *scope = state->scopes[--state->sCount];
     int scopeSize = getScopeSize(state, scope);
 
-    if (scopeSize != 0) {
+    if (scopeSize > 0) {
         writeIntLit(state, scopeSize);
         fwrite(";dealloc-uxncle JSR2\n", 21, 1, state->out);
         state->pushed -= SIZE_INT;
@@ -462,7 +466,6 @@ void compileWhile(UCompState *state, UASTNode *node) {
     jmpSub(state, loopStart);
     defineSubLbl(state, loopExit);
 }
-
 
 void compileAST(UCompState *state, UASTNode *node) {
     /* STATE nodes hold the expression in node->left, and the next expression in node->right */
