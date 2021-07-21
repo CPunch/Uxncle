@@ -16,6 +16,7 @@ static const char preamble[] =
     "@number [ &started $1 ]\n"
     "@uxncle [ &heap $2 ]\n"
     "|0100\n"
+    "@main-prg\n"
         /* setup mem lib */
         ";uxncle-heap .uxncle/heap STZ2\n";
 
@@ -249,6 +250,22 @@ int tryTypeCast(UCompState *state, UVarType from, UVarType to) {
     return 1;
 }
 
+int newLbl(UCompState *state) {
+    return state->jmpID++;
+}
+
+void defineSubLbl(UCompState *state, int subLblID) {
+    fprintf(state->out, "&lbl%d\n", subLblID);
+}
+
+void jmpCondSub(UCompState *state, int subLblID) {
+    fprintf(state->out, ",&lbl%d JCN\n", subLblID);
+}
+
+void jmpSub(UCompState *state, int subLblID) {
+    fprintf(state->out, ",&lbl%d JMP\n", subLblID);
+}
+
 /* ==================================[[ arithmetic ]]================================== */
 
 void pop(UCompState *state, int size) {
@@ -394,7 +411,7 @@ void compileScope(UCompState *state, UASTNode *node) {
 
 void compileIf(UCompState *state, UASTNode *node) {
     UASTIfNode *ifNode = (UASTIfNode*)node;
-    int jmpID = state->jmpID++;
+    int jmpID = newLbl(state);
 
     /* compile conditional */
     UVarType type = compileExpression(state, node->left);
@@ -406,41 +423,44 @@ void compileIf(UCompState *state, UASTNode *node) {
     if (ifNode->elseBlock) {
         int tmpJmp = jmpID;
         /* write comparison jump, if the flag is equal to true, skip the else statements */
-        fprintf(state->out, ";jmp%d JCN2\n", tmpJmp);
+        jmpCondSub(state, tmpJmp);
         compileAST(state, ifNode->elseBlock);
-        fprintf(state->out, ";jmp%d JMP2\n", jmpID = state->jmpID++);
+        jmpCondSub(state, jmpID = newLbl(state));
         /* true block */
-        fprintf(state->out, "@jmp%d\n", tmpJmp);
+        defineSubLbl(state, tmpJmp);
         compileAST(state, ifNode->block);
     } else {
         /* write comparison jump, if the flag is not equal to true, skip the true statements */
-        fprintf(state->out, "#01 NEQ ;jmp%d JCN2\n", jmpID);
+        fprintf(state->out, "#01 NEQ ");
+        jmpCondSub(state, jmpID);
         compileAST(state, ifNode->block);
     }
 
-    fprintf(state->out, "@jmp%d\n", jmpID);
+    defineSubLbl(state, jmpID);
 }
 
 void compileWhile(UCompState *state, UASTNode *node) {
     UASTWhileNode *ifNode = (UASTWhileNode*)node;
-    int loopStart = state->jmpID++;
-    int jmpID = state->jmpID++;
+    int loopStart = newLbl(state);
+    int loopExit = newLbl(state);
 
     /* compile conditional */
-    fprintf(state->out, "@loop%d\n", loopStart);
+    defineSubLbl(state, loopStart);
     UVarType type = compileExpression(state, node->left);
 
     if (!tryTypeCast(state, type, TYPE_BOOL))
         cErrorNode(state, (UASTNode*)ifNode, "Cannot cast type '%s' to type '%s'", getTypeName(type), getTypeName(TYPE_BOOL));
 
-    /* write comparison jump, if the flag is not equal to true, skip the true statements */
-    fprintf(state->out, "#01 NEQ ;jmp%d JCN2\n", jmpID);
+    /* write comparison jump, if the flag is not equal to true, exit the loop */
+    fprintf(state->out, "#01 NEQ ");
+    jmpCondSub(state, loopExit);
     state->pushed -= SIZE_BOOL;
 
     compileAST(state, ifNode->block);
 
-    fprintf(state->out, ";loop%d JMP2\n", loopStart);
-    fprintf(state->out, "@jmp%d\n", jmpID);
+    /* jump back to the start of the loop */
+    jmpSub(state, loopStart);
+    defineSubLbl(state, loopExit);
 }
 
 
