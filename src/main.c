@@ -4,7 +4,7 @@
 int main() {
     UASTRootNode *tree = UP_parseSource(
         "int i = 0;\n"
-        "while (i != 10) {\n"
+        "while (i < 10) {\n"
         "   prntint i;\n"
         "   i = i + 1;\n"
         "}\n"

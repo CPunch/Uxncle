@@ -188,8 +188,12 @@ UASTNode* binOperator(UParseState *state, UASTNode *left, Precedence currPrec) {
         case TOKEN_MINUS: type = NODE_SUB; break;
         case TOKEN_STAR: type = NODE_MUL; break;
         case TOKEN_SLASH: type = NODE_DIV; break;
+        case TOKEN_LESS: type = NODE_LESS; break;
+        case TOKEN_GREATER: type = NODE_GREATER; break;
         case TOKEN_EQUAL_EQUAL: type = NODE_EQUAL; break;
-        case TOKEN_BANG_EQUAL: type = NODE_NOTEQUAL; break;
+        case TOKEN_BANG_EQUAL: type = NODE_NEQUAL; break;
+        case TOKEN_LESS_EQUAL: type = NODE_LESS_EQUAL; break;
+        case TOKEN_GREATER_EQUAL: type = NODE_GREATER_EQUAL; break;
         default:
             error(state, "Unknown binary operator '%.*s'!", state->current.len, state->current.str);
             return NULL;
@@ -245,9 +249,13 @@ ParseRule ruleTable[] = {
     {NULL, binOperator, PREC_FACTOR}, /* TOKEN_SLASH */
     {NULL, binOperator, PREC_FACTOR}, /* TOKEN_STAR */
     {NULL, NULL, PREC_NONE}, /* TOKEN_BANG */
+    {NULL, binOperator, PREC_COMPAR}, /* TOKEN_LESS */
+    {NULL, binOperator, PREC_COMPAR}, /* TOKEN_GREATER */
 
     {NULL, binOperator, PREC_COMPAR}, /* TOKEN_EQUAL_EQUAL */
     {NULL, binOperator, PREC_COMPAR}, /* TOKEN_BANG_EQUAL */
+    {NULL, binOperator, PREC_COMPAR}, /* TOKEN_LESS_EQUAL */
+    {NULL, binOperator, PREC_COMPAR}, /* TOKEN_GREATER_EQUAL */
     {NULL, NULL, PREC_NONE}, /* TOKEN_EOF */
     {NULL, NULL, PREC_NONE}, /* TOKEN_UNREC */
     {NULL, NULL, PREC_NONE}, /* TOKEN_ERR */
@@ -419,6 +427,12 @@ void printNode(UASTNode *node) {
         case NODE_SUB: printf("SUB"); break;
         case NODE_MUL: printf("MUL"); break;
         case NODE_DIV: printf("DIV"); break;
+        case NODE_LESS: printf("LTH"); break;
+        case NODE_GREATER: printf("GTH"); break;
+        case NODE_LESS_EQUAL: printf("LEQ"); break;
+        case NODE_GREATER_EQUAL: printf("GEQ"); break;
+        case NODE_EQUAL: printf("EQU"); break;
+        case NODE_NEQUAL: printf("NEQ"); break;
         case NODE_ASSIGN: printf("ASSIGN"); break;
         case NODE_INTLIT: printf("[%d]", ((UASTIntNode*)node)->num); break;
         case NODE_TREEROOT: printf("ROOT"); break;

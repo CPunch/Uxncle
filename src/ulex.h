@@ -32,10 +32,14 @@ typedef enum {
     TOKEN_SLASH,
     TOKEN_STAR,
     TOKEN_BANG,
+    TOKEN_LESS,
+    TOKEN_GREATER,
 
     /* two character tokens */
     TOKEN_EQUAL_EQUAL,
     TOKEN_BANG_EQUAL,
+    TOKEN_LESS_EQUAL,
+    TOKEN_GREATER_EQUAL,
 
     TOKEN_EOF, /* end of file */
     TOKEN_UNREC, /* unrecognized symbol */

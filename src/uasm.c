@@ -349,7 +349,10 @@ UVarType compileExpression(UCompState *state, UASTNode *node) {
         case NODE_MUL: doArith(state, "MUL", lType); break;
         case NODE_DIV: doArith(state, "DIV", lType); break;
         case NODE_EQUAL: doComp(state, "EQU", lType); return TYPE_BOOL;
-        case NODE_NOTEQUAL: doComp(state, "NEQ", lType); return TYPE_BOOL;
+        case NODE_NEQUAL: doComp(state, "NEQ", lType); return TYPE_BOOL;
+        case NODE_LESS: doComp(state, "LTH", lType); return TYPE_BOOL;
+        case NODE_GREATER: doComp(state, "GTH", lType); return TYPE_BOOL;
+        /* TODO: NODE_LESS_EQUAL && NODE_GREATER_EQUAL */
         case NODE_INTLIT: writeIntLit(state, ((UASTIntNode*)node)->num); return TYPE_INT;
         case NODE_VAR: return compileVar(state, node); break;
         default:

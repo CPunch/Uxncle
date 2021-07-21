@@ -14,8 +14,12 @@ typedef enum {
     NODE_SUB,
     NODE_MUL,
     NODE_DIV,
+    NODE_LESS,
+    NODE_GREATER,
     NODE_EQUAL,
-    NODE_NOTEQUAL,
+    NODE_NEQUAL,
+    NODE_LESS_EQUAL,
+    NODE_GREATER_EQUAL,
     /* literals */
     NODE_INTLIT,
     NODE_VAR,

@@ -199,11 +199,13 @@ UToken UL_scanNext(ULexState *state) {
         case '}': return makeToken(state, TOKEN_RIGHT_BRACE);
         case '[': return makeToken(state, TOKEN_LEFT_BRACKET);
         case ']': return makeToken(state, TOKEN_RIGHT_BRACKET);
+        case ';': return makeToken(state, TOKEN_COLON);
         case '+': return makeToken(state, TOKEN_PLUS);
         case '-': return makeToken(state, TOKEN_MINUS);
         case '/': return makeToken(state, TOKEN_SLASH);
         case '*': return makeToken(state, TOKEN_STAR);
-        case ';': return makeToken(state, TOKEN_COLON);
+        case '>': return charMatch(state, '=') ? makeToken(state, TOKEN_GREATER_EQUAL) : makeToken(state, TOKEN_GREATER);
+        case '<': return charMatch(state, '=') ? makeToken(state, TOKEN_LESS_EQUAL) : makeToken(state, TOKEN_LESS);
         case '=': return charMatch(state, '=') ? makeToken(state, TOKEN_EQUAL_EQUAL) : makeToken(state, TOKEN_EQUAL);
         case '!': return charMatch(state, '=') ? makeToken(state, TOKEN_BANG_EQUAL) : makeToken(state, TOKEN_BANG);
         case '\'': return readCharacter(state);
