@@ -124,8 +124,6 @@ void advance(UParseState *state) {
     state->previous = state->current;
     state->current = UL_scanNext(&state->lstate);
 
-    printf("consumed '%.*s', with type %d\n", state->current.len, state->current.str, state->current.type);
-
     switch(state->current.type) {
         case TOKEN_UNREC: error(state, "Unrecognized symbol '%.*s'!", state->current.len, state->current.str); break;
         case TOKEN_ERR: error(state, "%.*s", state->current.len, state->current.str); break;
@@ -158,13 +156,11 @@ ParseRule* getRule(UTokenType type) {
 
 UASTNode* number(UParseState *state, UASTNode *left, Precedence currPrec) {
     int num = strtol(state->previous.str, NULL, 10);
-    printf("got number %d! from token '%.*s' [%d]\n", num, state->previous.len, state->previous.str, state->previous.type);
     return newNumNode(state, state->previous, NULL, NULL, num);
 }
 
 UASTNode* hexnum(UParseState *state, UASTNode *left, Precedence currPrec) {
     int num = strtol(state->previous.str + 2, NULL, 16); /* +2 to skip 0x */
-    printf("got number %d! from token '%.*s' [%d]\n", num, state->previous.len, state->previous.str, state->previous.type);
     return newNumNode(state, state->previous, NULL, NULL, num);
 }
 
@@ -472,7 +468,6 @@ UASTRootNode *UP_parseSource(const char *src) {
     UParseState state;
     UASTRootNode *root = NULL;
     UScope *scope;
-    int treeIndent = 16;
 
     UL_initLexState(&state.lstate, src);
     advance(&state);
@@ -484,7 +479,7 @@ UASTRootNode *UP_parseSource(const char *src) {
     root->scope = *scope;
 
     endScope(&state);
-    printTree((UASTNode*)root, treeIndent);
+    /* printTree((UASTNode*)root, 16); */
     return root;
 }
 
