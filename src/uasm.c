@@ -262,8 +262,10 @@ void defineSubLbl(UCompState *state, int subLblID) {
     fprintf(state->out, "&lbl%d\n", subLblID);
 }
 
+/* expects TYPE_BOOL at the top of the stack */
 void jmpCondSub(UCompState *state, int subLblID) {
     fprintf(state->out, ",&lbl%d JCN\n", subLblID);
+    state->pushed -= SIZE_BOOL;
 }
 
 void jmpSub(UCompState *state, int subLblID) {
@@ -384,6 +386,19 @@ UVarType compileExpression(UCompState *state, UASTNode *node) {
     return lType;
 }
 
+/* compile an expression without leaving anything on the stack */
+void compileVoidExpression(UCompState *state, UASTNode *node) {
+    int savedPushed = state->pushed;
+
+    if (node->type == NODE_ASSIGN)
+        compileAssignment(state, node, 0);
+    else
+        compileExpression(state, node);
+
+    /* clean the stack */
+    pop(state, state->pushed - savedPushed);
+}
+
 void compilePrintInt(UCompState *state, UASTNode *node) {
     compileExpression(state, node->left);
     fwrite(";print-decimal JSR2 #20 .Console/char DEO\n", 42, 1, state->out);
@@ -422,20 +437,19 @@ void compileIf(UCompState *state, UASTNode *node) {
     UVarType type = compileExpression(state, node->left);
 
     if (!tryTypeCast(state, type, TYPE_BOOL))
-        cErrorNode(state, (UASTNode*)ifNode, "Cannot cast type '%s' to type '%s'", getTypeName(type), getTypeName(TYPE_BOOL));
+        cErrorNode(state, (UASTNode*)node->left, "Cannot cast type '%s' to type '%s'", getTypeName(type), getTypeName(TYPE_BOOL));
 
-    state->pushed -= SIZE_BOOL;
     if (ifNode->elseBlock) {
         int tmpJmp = jmpID;
-        /* write comparison jump, if the flag is equal to true, skip the else statements */
+        /* write comparison jump, if the flag is equal to true, jump to the true block */
         jmpCondSub(state, tmpJmp);
         compileAST(state, ifNode->elseBlock);
-        jmpCondSub(state, jmpID = newLbl(state));
+        jmpSub(state, jmpID = newLbl(state)); /* skip the true block */
         /* true block */
         defineSubLbl(state, tmpJmp);
         compileAST(state, ifNode->block);
     } else {
-        /* write comparison jump, if the flag is not equal to true, skip the true statements */
+        /* write comparison jump, if the flag is not equal to true, skip the true block */
         fprintf(state->out, "#01 NEQ ");
         jmpCondSub(state, jmpID);
         compileAST(state, ifNode->block);
@@ -445,7 +459,7 @@ void compileIf(UCompState *state, UASTNode *node) {
 }
 
 void compileWhile(UCompState *state, UASTNode *node) {
-    UASTWhileNode *ifNode = (UASTWhileNode*)node;
+    UASTWhileNode *whileNode = (UASTWhileNode*)node;
     int loopStart = newLbl(state);
     int loopExit = newLbl(state);
 
@@ -454,14 +468,47 @@ void compileWhile(UCompState *state, UASTNode *node) {
     UVarType type = compileExpression(state, node->left);
 
     if (!tryTypeCast(state, type, TYPE_BOOL))
-        cErrorNode(state, (UASTNode*)ifNode, "Cannot cast type '%s' to type '%s'", getTypeName(type), getTypeName(TYPE_BOOL));
+        cErrorNode(state, node, "Cannot cast type '%s' to type '%s'", getTypeName(type), getTypeName(TYPE_BOOL));
 
     /* write comparison jump, if the flag is not equal to true, exit the loop */
     fprintf(state->out, "#01 NEQ ");
     jmpCondSub(state, loopExit);
-    state->pushed -= SIZE_BOOL;
 
-    compileAST(state, ifNode->block);
+    compileAST(state, whileNode->block);
+
+    /* jump back to the start of the loop */
+    jmpSub(state, loopStart);
+    defineSubLbl(state, loopExit);
+}
+
+void compileFor(UCompState *state, UASTNode *node) {
+    UVarType type;
+    UASTForNode *forNode = (UASTForNode*)node;
+    int loopEntry = newLbl(state);
+    int loopStart = newLbl(state);
+    int loopExit = newLbl(state);
+
+    /* compile initalizer */
+    compileVoidExpression(state, node->left);
+    jmpSub(state, loopEntry); /* on entry, we skip the iterator */
+
+    /* compile iterator */
+    defineSubLbl(state, loopStart);
+    compileVoidExpression(state, forNode->iter);
+
+    /* compile conditional */
+    defineSubLbl(state, loopEntry);
+    type = compileExpression(state, forNode->cond);
+
+    if (!tryTypeCast(state, type, TYPE_BOOL))
+        cErrorNode(state, node, "Cannot cast type '%s' to type '%s'", getTypeName(type), getTypeName(TYPE_BOOL));
+
+    /* write comparison jump, if the flag is not equal to true, exit the loop */
+    fprintf(state->out, "#01 NEQ ");
+    jmpCondSub(state, loopExit);
+
+    /* finally, compile loop block */
+    compileAST(state, forNode->block);
 
     /* jump back to the start of the loop */
     jmpSub(state, loopStart);
@@ -471,25 +518,17 @@ void compileWhile(UCompState *state, UASTNode *node) {
 void compileAST(UCompState *state, UASTNode *node) {
     /* STATE nodes hold the expression in node->left, and the next expression in node->right */
     while (node) {
-        int startPushed = state->pushed;
-        switch(node->type) {
+        switch(node->type) { /* these functions should NOT leave any values on the stack */
             case NODE_STATE_PRNT: compilePrintInt(state, node); break;
             case NODE_STATE_DECLARE_VAR: compileDeclaration(state, node); break;
-            case NODE_STATE_EXPR: 
-                if (node->left->type == NODE_ASSIGN)
-                    compileAssignment(state, node->left, 0);
-                else
-                    compileExpression(state, node->left); 
-                break;
+            case NODE_STATE_EXPR: compileVoidExpression(state, node->left); break;
             case NODE_STATE_SCOPE: compileScope(state, node); break;
             case NODE_STATE_IF: compileIf(state, node); break;
             case NODE_STATE_WHILE: compileWhile(state, node); break;
+            case NODE_STATE_FOR: compileFor(state, node); break;
             default:
                 cError(state, "unknown statement node!! [%d]\n", node->type);
         }
-
-        /* clean the stack */
-        pop(state, state->pushed - startPushed);
 
         /* move to the next statement */
         node = node->right;

@@ -54,5 +54,7 @@ int main(int argc, const char *argv[]) {
     /* clean up */
     UP_freeTree((UASTNode*)tree);
     free(src);
+
+    printf("Compiled successfully! Wrote generated uxntal to %s\n", out);
     return 0;
 }

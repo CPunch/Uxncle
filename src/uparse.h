@@ -35,6 +35,7 @@ typedef enum {
     NODE_STATE_EXPR,
     NODE_STATE_IF,
     NODE_STATE_WHILE,
+    NODE_STATE_FOR,
     /* scopes are different, node->left holds the statement tree for the scope, node->right holds the next statement */
     NODE_STATE_SCOPE,
 } UASTNodeType;
@@ -98,6 +99,13 @@ typedef struct {
     COMMON_NODE_HEADER;
     UASTNode *block;
 } UASTWhileNode;
+
+typedef struct {
+    COMMON_NODE_HEADER;
+    UASTNode *cond;
+    UASTNode *iter;
+    UASTNode *block;
+} UASTForNode;
 
 typedef struct {
     /* lexer related info */

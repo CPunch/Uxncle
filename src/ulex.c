@@ -13,6 +13,7 @@ UReservedWord reservedWords[] = {
     {TOKEN_VOID, "void", 4},
     {TOKEN_BOOL, "bool", 4},
     {TOKEN_WHILE, "while", 5},
+    {TOKEN_FOR, "for", 3},
     {TOKEN_PRINTINT, "prntint", 7},
     {TOKEN_IF, "if", 2},
     {TOKEN_ELSE, "else", 4},

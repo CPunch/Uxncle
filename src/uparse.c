@@ -224,6 +224,7 @@ ParseRule ruleTable[] = {
     {NULL, NULL, PREC_NONE}, /* TOKEN_IF */
     {NULL, NULL, PREC_NONE}, /* TOKEN_ELSE */
     {NULL, NULL, PREC_NONE}, /* TOKEN_WHILE */
+    {NULL, NULL, PREC_NONE}, /* TOKEN_FOR */
 
     /* literals */
     {identifer, NULL, PREC_LITERAL}, /* TOKEN_IDENT */
@@ -373,7 +374,34 @@ UASTNode* whileStatement(UParseState *state) {
     if (!match(state, TOKEN_RIGHT_PAREN))
         error(state, "Expected ')' to end while conditional!");
 
-    /* parse the true block */
+    /* parse the loop block */
+    node->block = statement(state);
+    return (UASTNode*)node;
+}
+
+UASTNode* forStatement(UParseState *state) {
+    UASTForNode *node = (UASTForNode*)newBaseNode(state, state->previous, sizeof(UASTForNode), NODE_STATE_FOR, NULL, NULL);
+
+    if (!match(state, TOKEN_LEFT_PAREN))
+        error(state, "Expected '(' to start for initalizer!");
+
+    /* set the initalizer */
+    node->_node.left = expression(state);
+
+    if (!match(state, TOKEN_COLON))
+        error(state, "Expected ';' to start for conditional!");
+
+    node->cond = expression(state);
+
+    if (!match(state, TOKEN_COLON))
+        error(state, "Expected ';' to start for iterator!");
+
+    node->iter = expression(state);
+
+    if (!match(state, TOKEN_RIGHT_PAREN))
+        error(state, "Expected ')' to end for iterator!");
+
+    /* parse the loop block */
     node->block = statement(state);
     return (UASTNode*)node;
 }
@@ -404,6 +432,8 @@ UASTNode* statement(UParseState *state) {
         return ifStatement(state);
     } else if (match(state, TOKEN_WHILE)) {
         return whileStatement(state);
+    } else if (match(state, TOKEN_FOR)) {
+        return forStatement(state);
     } else {
         UToken tkn = state->previous;
         /* no statement match was found, just parse the expression */
@@ -437,6 +467,7 @@ void printNode(UASTNode *node) {
         case NODE_STATE_DECLARE_VAR: printf("NVAR"); break;
         case NODE_STATE_IF: printf("IF"); break;
         case NODE_STATE_WHILE: printf("WHIL"); break;
+        case NODE_STATE_FOR: printf("FOR"); break;
         case NODE_VAR: printf("VAR[%d]", ((UASTVarNode*)node)->var); break;
         case NODE_STATE_EXPR: printf("EXPR"); break;
         default: break;
